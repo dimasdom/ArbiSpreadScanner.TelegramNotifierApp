@@ -1,0 +1,37 @@
+using ArbiScanner.TelegramNotifierApp.Domain.Settings;
+using ArbiScanner.TelegramNotifierApp.Worker.Worker.TelegramMessageController;
+using ArbiScannerWeb.Domain.Models;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using Telegram.Bot;
+using Telegram.Bot.Types;
+using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.ReplyMarkups;
+
+namespace ArbiScanner.TelegramNotifierApp.Worker.Worker.TelegramMessageController;
+public class TelegramMessageController : BackgroundService
+{
+    private readonly IServiceProvider _serviceProvider;
+    private readonly IOptions<TelegramSettings> _settings;
+
+    public TelegramMessageController(IServiceProvider serviceProvider, IOptions<TelegramSettings> settings)
+    {
+        _serviceProvider = serviceProvider;
+        _settings = settings;
+    }
+
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        using var cts = new CancellationTokenSource();
+        var bot = new TelegramBotClient(_settings.Value.BotToken, cancellationToken: cts.Token);
+        MainController mainController = _serviceProvider.GetRequiredService<MainController>();
+        bot.StartReceiving(
+            mainController.Index,
+            (botClient, exception, errorSource, ct) => MainController.HandleErrorAsync(botClient, exception, ct),
+            cancellationToken: cts.Token);
+        return Task.CompletedTask;
+    }
+}
+
+

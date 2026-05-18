@@ -1,0 +1,21 @@
+# Build output folders
+**/bin/
+**/obj/
+**/[Dd]ebug/
+**/[Rr]elease/
+
+# Test and coverage output
+**/TestResults/
+**/coverage/
+**/*.coverage
+**/*.coveragexml
+
+# Generated user/IDE files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# NuGet package folders (if present)
+**/packages/
