@@ -19,10 +19,17 @@ COPY ArbiScannerWebApp/ArbiScannerWeb.Abstractions/ArbiScannerWeb.Abstractions.c
      ArbiScannerWebApp/ArbiScannerWeb.Abstractions/
 COPY ArbiScannerWebApp/ArbiScannerWeb.Domain/ArbiScannerWeb.Domain.csproj \
      ArbiScannerWebApp/ArbiScannerWeb.Domain/
+COPY ArbiScannerWebApp/ArbiScannerWeb.Infrastructure/ArbiScannerWeb.Infrastructure.csproj \
+     ArbiScannerWebApp/ArbiScannerWeb.Infrastructure/
 
-# Copy ArbiScannerAdminPanel.Infrastructure — referenced by the Worker
+# Copy ArbiScannerAdminPanel projects — Infrastructure referenced by the Worker,
+# Domain and Abstractions are transitive deps of Infrastructure
 COPY ArbiScannerAdminPannel/ArbiScannerAdminPanel.Infrastructure/ArbiScannerAdminPanel.Infrastructure.csproj \
      ArbiScannerAdminPannel/ArbiScannerAdminPanel.Infrastructure/
+COPY ArbiScannerAdminPannel/ArbiScannerAdminPanel.Domain/ArbiScannerAdminPanel.Domain.csproj \
+     ArbiScannerAdminPannel/ArbiScannerAdminPanel.Domain/
+COPY ArbiScannerAdminPannel/ArbiScannerAdminPanel.Abstractions/ArbiScannerAdminPanel.Abstractions.csproj \
+     ArbiScannerAdminPannel/ArbiScannerAdminPanel.Abstractions/
 
 RUN dotnet restore ArbiScanner.TelegramNotifierApp/ArbiScanner.TelegramNotifierApp.Worker/ArbiScanner.TelegramNotifierApp.Worker.csproj
 
@@ -30,7 +37,10 @@ RUN dotnet restore ArbiScanner.TelegramNotifierApp/ArbiScanner.TelegramNotifierA
 COPY ArbiScanner.TelegramNotifierApp/ ./ArbiScanner.TelegramNotifierApp/
 COPY ArbiScannerWebApp/ArbiScannerWeb.Abstractions/ ./ArbiScannerWebApp/ArbiScannerWeb.Abstractions/
 COPY ArbiScannerWebApp/ArbiScannerWeb.Domain/ ./ArbiScannerWebApp/ArbiScannerWeb.Domain/
+COPY ArbiScannerWebApp/ArbiScannerWeb.Infrastructure/ ./ArbiScannerWebApp/ArbiScannerWeb.Infrastructure/
 COPY ArbiScannerAdminPannel/ArbiScannerAdminPanel.Infrastructure/ ./ArbiScannerAdminPannel/ArbiScannerAdminPanel.Infrastructure/
+COPY ArbiScannerAdminPannel/ArbiScannerAdminPanel.Domain/ ./ArbiScannerAdminPannel/ArbiScannerAdminPanel.Domain/
+COPY ArbiScannerAdminPannel/ArbiScannerAdminPanel.Abstractions/ ./ArbiScannerAdminPannel/ArbiScannerAdminPanel.Abstractions/
 
 RUN dotnet publish ArbiScanner.TelegramNotifierApp/ArbiScanner.TelegramNotifierApp.Worker/ArbiScanner.TelegramNotifierApp.Worker.csproj \
     -c Release \
