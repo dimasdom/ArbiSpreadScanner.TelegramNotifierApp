@@ -27,6 +27,7 @@ public class TelegramUserService : ITelegramUserService
               userSettings.UserName = userName;
               userSettings.HaveAccess = true;
               _dbContext.UserSettings.Update(userSettings);
+              _dbContext.TelegramLinkRequests.Remove(linkRequest);
               await _dbContext.SaveChangesAsync();
           }
           else

@@ -24,6 +24,7 @@ public class SpreadService : ISpreadService
             {
                 using var context = _dbContextFactory.CreateDbContext();
                 var usersWhoMatchCriteria = context.UserSettings
+                .AsNoTracking()
                 .Include(x => x.Exchanges)
                     .ThenInclude(ue => ue.Exchange)
                 .Where(x => 
