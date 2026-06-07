@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="../../ArbiScannerWebApp/ArbiScannerWeb.Domain/ArbiScannerWeb.Domain.csproj" />
     <ProjectReference Include="../ArbiScanner.TelegramNotifierApp.Infrastructure/ArbiScanner.TelegramNotifierApp.Infrastructure.csproj" />
+    <ProjectReference Include="../ArbiScanner.TelegramNotifierApp.Abstractions/ArbiScanner.TelegramNotifierApp.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>
