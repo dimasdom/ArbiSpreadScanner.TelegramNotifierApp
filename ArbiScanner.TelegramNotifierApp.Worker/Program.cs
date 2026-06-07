@@ -11,8 +11,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using OpenTelemetry.Metrics;
 using ProtoBuf.Meta;
 using Serilog;
+using Serilog.Enrichers.Span;
 using Telegram.Bot;
 
 Log.Logger = new LoggerConfiguration()
@@ -22,7 +26,8 @@ Log.Logger = new LoggerConfiguration()
 try
 {
     var host = Host.CreateDefaultBuilder(args)
-        .UseSerilog((ctx, cfg) => cfg.ReadFrom.Configuration(ctx.Configuration))
+        .UseSerilog((ctx, cfg) => cfg.ReadFrom.Configuration(ctx.Configuration)
+            .Enrich.WithSpan())
         .ConfigureServices((context, services) =>
         {
             services.AddHostedService<SpreadsMessageBroker>();
@@ -50,6 +55,21 @@ try
             });
             services.Configure<RabbitMqSettings>(context.Configuration.GetSection("RabbitMq"));
             services.Configure<TelegramSettings>(context.Configuration.GetSection("Telegram"));
+
+            services.AddOpenTelemetry()
+                .ConfigureResource(r => r.AddService("arbiscanner-telegram-notifier", serviceVersion: "1.0.0"))
+                .WithTracing(tracing => tracing
+                    .AddHttpClientInstrumentation(o => o.RecordException = true)
+                    .AddEntityFrameworkCoreInstrumentation()
+                    .AddSource("RabbitMQ.Client.*")
+                    .AddOtlpExporter())
+                .WithMetrics(metrics => metrics
+                    .AddHttpClientInstrumentation()
+                    .AddRuntimeInstrumentation()
+                    .AddPrometheusHttpListener(o =>
+                    {
+                        o.UriPrefixes = ["http://+:8085/"];
+                    }));
         })
         .Build();
 

@@ -22,8 +22,7 @@ COPY ArbiScannerWebApp/ArbiScannerWeb.Domain/ArbiScannerWeb.Domain.csproj \
 COPY ArbiScannerWebApp/ArbiScannerWeb.Infrastructure/ArbiScannerWeb.Infrastructure.csproj \
      ArbiScannerWebApp/ArbiScannerWeb.Infrastructure/
 
-# Copy ArbiScannerAdminPanel projects — Infrastructure referenced by the Worker,
-# Domain and Abstractions are transitive deps of Infrastructure
+# Copy ArbiScannerAdminPanel projects — Infrastructure is referenced by the Worker
 COPY ArbiScannerAdminPannel/ArbiScannerAdminPanel.Infrastructure/ArbiScannerAdminPanel.Infrastructure.csproj \
      ArbiScannerAdminPannel/ArbiScannerAdminPanel.Infrastructure/
 COPY ArbiScannerAdminPannel/ArbiScannerAdminPanel.Domain/ArbiScannerAdminPanel.Domain.csproj \
