@@ -178,6 +178,10 @@ Packages: `Telegram.Bot`, `RabbitMQ.Client`, `Serilog` with `Serilog.Sinks.Grafa
 | FluentResults | Result-type error handling across service calls |
 | Serilog | Structured logging |
 | Serilog.Sinks.GrafanaLoki | Log shipping to Grafana Loki |
+| Serilog.Enrichers.Span | Enriches log events with `TraceId` / `SpanId` for trace-to-log correlation |
+| OpenTelemetry SDK | Distributed tracing and metrics |
+| OpenTelemetry.Exporter.OpenTelemetryProtocol | OTLP gRPC export of traces to Grafana Tempo |
+| OpenTelemetry.Exporter.Prometheus.HttpListener | Standalone `/metrics` HTTP server on port 8085 for Prometheus scraping |
 | Docker | Containerised deployment |
 
 ---
@@ -220,6 +224,9 @@ Packages: `Telegram.Bot`, `RabbitMQ.Client`, `Serilog` with `Serilog.Sinks.Grafa
      },
      "Telegram": {
        "BotToken": "your-bot-token-here"
+     },
+     "OpenTelemetry": {
+       "Endpoint": "http://localhost:4317"
      },
      "Serilog": {
        "WriteTo": [
@@ -264,6 +271,7 @@ All `appsettings.json` keys can be overridden with environment variables using t
 | `RabbitMq__Exchange` | Exchange name (default: `spread_fanout_exchange`). |
 | `RabbitMq__RoutingKey` | Routing key (empty string for fanout exchanges). |
 | `Serilog__WriteTo__1__Args__uri` | Grafana Loki endpoint URL (e.g. `http://loki:3100`). |
+| `OpenTelemetry__Endpoint` | OTLP gRPC endpoint for Grafana Tempo (e.g. `http://tempo:4317`). Defaults to `http://localhost:4317` from `appsettings.json`. |
 
 ---
 
