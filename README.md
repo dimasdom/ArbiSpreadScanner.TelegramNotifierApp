@@ -18,6 +18,7 @@ A .NET 10 background worker service that bridges the ArbiScanner platform with T
 - [Running Locally](#running-locally)
 - [Environment Variables](#environment-variables)
 - [Docker Build](#docker-build)
+- [Testing](#testing)
 - [Project Structure](#project-structure)
 
 ---
@@ -101,18 +102,11 @@ Telegram Bot API  ->  user's Telegram client
 
 **Message formats by spread type:**
 
-- **Futures** — Coin, spread %, long/short exchange with prices, slippage per leg, volatility (30 min), risk level, and per-exchange funding rates.
-- **Funding** — Coin, funding spread %, rate spread %, long/short exchange with prices, slippage, volatility, risk level, funding rates, and possible profit %.
-- **Spot** — Coin, spot spread %, spot and futures exchange prices, slippage per leg, volatility, risk level, funding rate, and possible profit %.
+- **Futures** — Coin, spread %, long/short exchange with prices, slippage per leg, and per-exchange funding rates.
+- **Funding** — Coin, funding spread %, rate spread %, long/short exchange with prices, slippage, funding rates, and possible profit %.
+- **Spot** — Coin, spot spread %, spot and futures exchange prices, slippage per leg, funding rate, and possible profit %.
 
-**Risk level classification** (volatility / spread ratio):
-
-| Ratio | Level |
-|---|---|
-| <= 15 % | Safe |
-| <= 30 % | Medium |
-| <= 50 % | Risky |
-| > 50 % | Dangerous |
+> These messages previously also included a "Volatility (30m)" figure and a derived Safe/Medium/Risky/Dangerous risk-level label (volatility-to-spread ratio thresholds at 15/30/50%). That scoring was cut platform-wide — the `Volatility` field was removed from `TradeOpportunityModel`/`ExchangeRateModel` in ArbitrageScanner, so this service no longer has a value to read or format. `SpreadService` was simplified accordingly; see [Testing](#testing) for the tests covering the current message format.
 
 ---
 
@@ -310,6 +304,23 @@ The compose file sets health checks for both PostgreSQL (`pg_isready`) and Rabbi
 
 ---
 
+## Testing
+
+`ArbiScanner.TelegramNotifierApp.Tests` is a unit test project (xUnit + NSubstitute + `Microsoft.EntityFrameworkCore.InMemory`) covering the Application layer:
+
+| File | Coverage |
+|---|---|
+| `SpreadServiceTests` | Spread percentage calculation and the Spot/Funding/Futures message constructors — including that a funding-rate line is included/omitted correctly (this is what would have caught a stale risk-level string left in a message template) |
+| `TelegramNotifierUserServiceTests` | `NotifyUser` against a substituted `ITelegramBotClient` — valid/empty/whitespace messages and bot-client exceptions all log as expected |
+| `TelegramUserServiceTests` | Link/unlink/active-status flows against a real EF Core `AppDbContext` backed by the in-memory provider (valid link, invalid link ID, link with no matching `UserSettings` row, unlinking a user that doesn't exist, etc.) |
+
+```bash
+cd ArbiScanner.TelegramNotifierApp
+dotnet test ArbiScanner.TelegramNotifierApp.Tests/ArbiScanner.TelegramNotifierApp.Tests.csproj
+```
+
+---
+
 ## Project Structure
 
 ```
@@ -344,6 +355,12 @@ ArbiScanner.TelegramNotifierApp/
 │   ├── Program.cs                       # Host setup, DI registration
 │   ├── appsettings.json
 │   └── appsettings.Development.json
+│
+├── ArbiScanner.TelegramNotifierApp.Tests/  # Unit tests — see Testing
+│   ├── SpreadServiceTests.cs
+│   ├── TelegramNotifierUserServiceTests.cs
+│   ├── TelegramUserServiceTests.cs
+│   └── TestHelpers.cs
 │
 ├── ArbiScanner.slnx                     # Solution file
 ├── Dockerfile                           # Multi-stage build (context: repo root)
