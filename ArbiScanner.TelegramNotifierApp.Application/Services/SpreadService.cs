@@ -74,21 +74,6 @@ public class SpreadService : ISpreadService
         {
             try
             {
-                string riskLevel = "";
-                if (possiblePosition.Volatility > 0)
-                {
-                    riskLevel = $"Volatility(30m): {possiblePosition.Volatility.ToString("0.00")}%\nRisk Level - ";
-                    double volatilityRatio = Math.Abs(possiblePosition.Volatility / possiblePosition.Spread * 100);
-
-                    if (volatilityRatio <= 15)
-                        riskLevel += "Safe";
-                    else if (volatilityRatio <= 30)
-                        riskLevel += "Medium";
-                    else if (volatilityRatio <= 50)
-                        riskLevel += "Risky";
-                    else
-                        riskLevel += "Dangerous";
-                }
                 string fundingForLong = "";
                 string fundingForShort = "";
                 try
@@ -108,7 +93,7 @@ public class SpreadService : ISpreadService
                 {
                     _logger.LogError(ex, "Error handling funding rates: {Message}", ex.Message);
                 }
-                var message = $"Coin: {possiblePosition.ExchangeRateA.Symbol}\nSpread: {possiblePosition.Spread.ToString("0.00")}%\nLong: {possiblePosition.ExchangeLong.Exchange}({possiblePosition.ExchangeLong.ExchangeRate}$)\nShort: {possiblePosition.ExchangeShort.Exchange}({possiblePosition.ExchangeShort.ExchangeRate}$)\nSlippage {possiblePosition.ExchangeLong.Exchange}: {possiblePosition.ExchangeLong.SlippageShort.ToString("0.00")}%\nSlippage {possiblePosition.ExchangeShort.Exchange}: {possiblePosition.ExchangeShort.SlippageLong.ToString("0.00")}%\n{riskLevel}{fundingForLong}{fundingForShort}";
+                var message = $"Coin: {possiblePosition.ExchangeRateA.Symbol}\nSpread: {possiblePosition.Spread.ToString("0.00")}%\nLong: {possiblePosition.ExchangeLong.Exchange}({possiblePosition.ExchangeLong.ExchangeRate}$)\nShort: {possiblePosition.ExchangeShort.Exchange}({possiblePosition.ExchangeShort.ExchangeRate}$)\nSlippage {possiblePosition.ExchangeLong.Exchange}: {possiblePosition.ExchangeLong.SlippageShort.ToString("0.00")}%\nSlippage {possiblePosition.ExchangeShort.Exchange}: {possiblePosition.ExchangeShort.SlippageLong.ToString("0.00")}%\n{fundingForLong}{fundingForShort}";
                 return message;
             }
             catch (Exception ex)
@@ -122,21 +107,6 @@ public class SpreadService : ISpreadService
             var rateSpread = CalculateSpreadFor(possiblePosition.ExchangeRateA.ExchangeRate, possiblePosition.ExchangeRateB.ExchangeRate);
             try
             {
-                string riskLevel = "";
-                if (possiblePosition.Volatility > 0)
-                {
-                    riskLevel = $"\nVolatility(30m): {possiblePosition.Volatility.ToString("0.00")}%\nRisk Level - ";
-                    double volatilityRatio = Math.Abs(possiblePosition.Volatility / possiblePosition.Spread * 100);
-
-                    if (volatilityRatio <= 15)
-                        riskLevel += "Safe";
-                    else if (volatilityRatio <= 30)
-                        riskLevel += "Medium";
-                    else if (volatilityRatio <= 50)
-                        riskLevel += "Risky";
-                    else
-                        riskLevel += "Dangerous";
-                }
                 string fundingForLong = "";
                 string fundingForShort = "";
                 try
@@ -156,7 +126,7 @@ public class SpreadService : ISpreadService
                 {
                     _logger.LogError(ex, "Error handling funding rates: {Message}", ex.Message);
                 }
-                string message = $"Coin: {possiblePosition.ExchangeRateA.Symbol}\nFunding Spread: {possiblePosition.TotalFunding.ToString("0.00")}%\nRate spread: {rateSpread.ToString("0.00")}%\nLong: {possiblePosition.ExchangeLong.Exchange}({possiblePosition.ExchangeLong.ExchangeRate}$)\nShort: {possiblePosition.ExchangeShort.Exchange}({possiblePosition.ExchangeShort.ExchangeRate}$)\nSlippage {possiblePosition.ExchangeLong.Exchange}: {possiblePosition.ExchangeLong.SlippageShort.ToString("0.00")}%\nSlippage {possiblePosition.ExchangeShort.Exchange}: {possiblePosition.ExchangeShort.SlippageLong.ToString("0.00")}%{riskLevel}{fundingForLong}{fundingForShort}\nPossible Profit:{possiblePosition.PossibleProfit.ToString("0.00")}%";
+                string message = $"Coin: {possiblePosition.ExchangeRateA.Symbol}\nFunding Spread: {possiblePosition.TotalFunding.ToString("0.00")}%\nRate spread: {rateSpread.ToString("0.00")}%\nLong: {possiblePosition.ExchangeLong.Exchange}({possiblePosition.ExchangeLong.ExchangeRate}$)\nShort: {possiblePosition.ExchangeShort.Exchange}({possiblePosition.ExchangeShort.ExchangeRate}$)\nSlippage {possiblePosition.ExchangeLong.Exchange}: {possiblePosition.ExchangeLong.SlippageShort.ToString("0.00")}%\nSlippage {possiblePosition.ExchangeShort.Exchange}: {possiblePosition.ExchangeShort.SlippageLong.ToString("0.00")}%{fundingForLong}{fundingForShort}";
                 return message;
             }
             catch (Exception ex)
@@ -169,21 +139,6 @@ public class SpreadService : ISpreadService
         {
             try
             {
-                string riskLevel = "";
-                if (possiblePosition.Volatility > 0)
-                {
-                    riskLevel = $"\nVolatility(30m): {possiblePosition.Volatility.ToString("0.00")}%\nRisk Level - ";
-                    double volatilityRatio = Math.Abs(possiblePosition.Volatility / possiblePosition.Spread * 100);
-
-                    if (volatilityRatio <= 15)
-                        riskLevel += "Safe";
-                    else if (volatilityRatio <= 30)
-                        riskLevel += "Medium";
-                    else if (volatilityRatio <= 50)
-                        riskLevel += "Risky";
-                    else
-                        riskLevel += "Dangerous";
-                }
                 string fundingForShort = "";
                 try
                 {
@@ -197,7 +152,7 @@ public class SpreadService : ISpreadService
                 {
                     _logger.LogError(ex, "Error handling funding rates: {Message}", ex.Message);
                 }
-                string message = $"Coin: {possiblePosition.ExchangeRateA.Symbol}\nSpot Spread: {possiblePosition.Spread.ToString("0.00")}%\n{possiblePosition.ExchangeLong.Exchange} Spot: ({possiblePosition.ExchangeLong.ExchangeRate}$)\n{possiblePosition.ExchangeShort.Exchange} Futures: ({possiblePosition.ExchangeShort.ExchangeRate}$)\nSlippage Spot: {possiblePosition.ExchangeLong.SlippageShort.ToString("0.00")}%\nSlippage Futures: {possiblePosition.ExchangeShort.SlippageLong.ToString("0.00")}%{riskLevel}{fundingForShort}\nPossible Profit:{possiblePosition.PossibleProfit.ToString("0.00")}%";
+                string message = $"Coin: {possiblePosition.ExchangeRateA.Symbol}\nSpot Spread: {possiblePosition.Spread.ToString("0.00")}%\n{possiblePosition.ExchangeLong.Exchange} Spot: ({possiblePosition.ExchangeLong.ExchangeRate}$)\n{possiblePosition.ExchangeShort.Exchange} Futures: ({possiblePosition.ExchangeShort.ExchangeRate}$)\nSlippage Spot: {possiblePosition.ExchangeLong.SlippageShort.ToString("0.00")}%\nSlippage Futures: {possiblePosition.ExchangeShort.SlippageLong.ToString("0.00")}%{fundingForShort}\nPossible Profit:{possiblePosition.PossibleProfit.ToString("0.00")}%";
                 return message;
             }
             catch (Exception ex)
