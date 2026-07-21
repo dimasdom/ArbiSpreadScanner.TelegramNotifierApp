@@ -1,5 +1,7 @@
 # ArbiScanner.TelegramNotifierApp
 
+> This submodule is part of the ArbiScanner monorepo. `docs/completed-work-summary.md`, referenced below, lives in that monorepo's root — not inside this repo.
+
 A .NET 10 background worker service that bridges the ArbiScanner platform with Telegram. It serves two purposes:
 
 1. **Spread notification delivery** — consumes spread events from a RabbitMQ fanout exchange and delivers formatted Telegram messages to every subscribed user whose filter criteria match the incoming opportunity.
@@ -18,6 +20,7 @@ A .NET 10 background worker service that bridges the ArbiScanner platform with T
 - [Running Locally](#running-locally)
 - [Environment Variables](#environment-variables)
 - [Docker Build](#docker-build)
+- [Code Quality & CI](#code-quality--ci)
 - [Testing](#testing)
 - [Project Structure](#project-structure)
 
@@ -66,9 +69,11 @@ spread_fanout_exchange  (type: fanout)
         |
         | bound queue
         v
-spread_telegram  (queue)
+spread_telegram  (durable queue, dead-letters to spread_telegram_dlq)
         |
-        | consumed by SpreadsMessageBroker (BackgroundService)
+        | consumed by SpreadsMessageBroker (BackgroundService), via the shared
+        | RabbitMqService (see below) — dedupes, retries, acks only after this
+        | actually finishes, not before
         v
 ISpreadService.HandleNewSpread / HandleCloseSpread
         |
@@ -150,7 +155,7 @@ Entry point and host. `Program.cs` wires up all DI registrations and starts the 
 
 Two hosted services run concurrently:
 
-- **`SpreadsMessageBroker`** (`Worker/MessageBroker/`) — a `BackgroundService` that connects to RabbitMQ, binds to the fanout exchange queue, and dispatches each received protobuf message to `ISpreadService`. Implements retry logic: if consuming fails, it stops the consumer, waits five seconds, and restarts.
+- **`SpreadsMessageBroker`** (`Worker/MessageBroker/`) — a `BackgroundService` that connects to RabbitMQ, binds to the fanout exchange queue, and dispatches each received protobuf message to `ISpreadService`. If the *connection* itself fails, it stops the consumer, waits five seconds, and reconnects. Message-level retry, dead-lettering, and idempotency all live one layer down, in the shared `RabbitMqService` (`ArbiScannerWeb.Infrastructure`, referenced via project reference — the same class the WebApp uses): it awaits `ISpreadService`'s handler fully before acking (previously it fired the handler via `Task.Run` and acked immediately, so a message could be acked before it was actually processed), retries transient failures with Polly, dead-letters after exhausting retries instead of requeuing forever, and de-duplicates redelivered messages via a Redis `SET NX` claim.
 - **`TelegramMessageController`** (`Worker/TelegramMessageController/`) — a `BackgroundService` that instantiates a `TelegramBotClient` and starts long-polling via `StartReceiving`. Each received update is dispatched to `MainController.Index`, which routes text messages to the appropriate handler (link code, resume, pause, or fallback).
 
 Also references: `ArbiScannerAdminPanel.Infrastructure` (shared DbContext and models), `ArbiScannerWeb.Abstractions`, `ArbiScannerWeb.Domain`.
@@ -169,6 +174,9 @@ Packages: `Telegram.Bot`, `RabbitMQ.Client`, `Serilog` with `Serilog.Sinks.Grafa
 | protobuf-net | Deserializing `TradeOpportunityModel` messages |
 | Entity Framework Core 10 | ORM for PostgreSQL |
 | Npgsql | PostgreSQL driver for EF Core |
+| StackExchange.Redis | Idempotency dedupe for redelivered RabbitMQ messages (via the shared `RabbitMqService`) — this service had no Redis dependency before |
+| Polly.Core | Retry (exponential backoff + jitter) around message processing, via the shared `RabbitMqService` |
+| Microsoft.Extensions.Diagnostics.HealthChecks | Postgres/Redis/RabbitMQ checks exposed at `/health` on a minimal web host (port 8090), alongside the existing `/metrics` listener on 8085 |
 | FluentResults | Result-type error handling across service calls |
 | Serilog | Structured logging |
 | Serilog.Sinks.GrafanaLoki | Log shipping to Grafana Loki |
@@ -185,6 +193,7 @@ Packages: `Telegram.Bot`, `RabbitMQ.Client`, `Serilog` with `Serilog.Sinks.Grafa
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - PostgreSQL 17 (database: `ArbiScannerBot`)
 - RabbitMQ 3.x with management plugin
+- Redis (used for RabbitMQ message-dedupe — see [RabbitMQ Message Flow](#rabbitmq-message-flow))
 - A Telegram bot token obtained from [@BotFather](https://t.me/BotFather)
 - The ArbiScanner web application database must be migrated and reachable (the link table is shared)
 
@@ -199,7 +208,7 @@ Packages: `Telegram.Bot`, `RabbitMQ.Client`, `Serilog` with `Serilog.Sinks.Grafa
    git submodule update --init --recursive
    ```
 
-2. Ensure PostgreSQL and RabbitMQ are running and accessible.
+2. Ensure PostgreSQL, RabbitMQ, and Redis are running and accessible.
 
 3. Configure `appsettings.json` (or `appsettings.Development.json`) in `ArbiScanner.TelegramNotifierApp.Worker/`:
 
@@ -215,6 +224,9 @@ Packages: `Telegram.Bot`, `RabbitMQ.Client`, `Serilog` with `Serilog.Sinks.Grafa
        "Password": "guest",
        "Exchange": "spread_fanout_exchange",
        "RoutingKey": ""
+     },
+     "Redis": {
+       "Endpoint": "localhost:6379"
      },
      "Telegram": {
        "BotToken": "your-bot-token-here"
@@ -264,6 +276,7 @@ All `appsettings.json` keys can be overridden with environment variables using t
 | `RabbitMq__Password` | RabbitMQ password. |
 | `RabbitMq__Exchange` | Exchange name (default: `spread_fanout_exchange`). |
 | `RabbitMq__RoutingKey` | Routing key (empty string for fanout exchanges). |
+| `Redis__Endpoint` | Redis connection string, e.g. `redis:6379`. Used for RabbitMQ message-dedupe (see [RabbitMQ Message Flow](#rabbitmq-message-flow)). |
 | `Serilog__WriteTo__1__Args__uri` | Grafana Loki endpoint URL (e.g. `http://loki:3100`). |
 | `OpenTelemetry__Endpoint` | OTLP gRPC endpoint for Grafana Tempo (e.g. `http://tempo:4317`). Defaults to `http://localhost:4317` from `appsettings.json`. |
 
@@ -285,14 +298,14 @@ docker build \
 
 **Run with Docker Compose (recommended):**
 
-The `docker-compose.yml` inside `ArbiScanner.TelegramNotifierApp/` starts the worker together with PostgreSQL 17 and RabbitMQ 3 (with the management UI on port 15672). The worker waits for both services to pass their health checks before starting.
+The `docker-compose.yml` inside `ArbiScanner.TelegramNotifierApp/` starts the worker together with PostgreSQL 17, RabbitMQ 3 (with the management UI on port 15672), and Redis. The worker waits for all three to pass their health checks before starting.
 
 ```bash
 # From ArbiScanner.TelegramNotifierApp/
 TELEGRAM_BOT_TOKEN=your-bot-token docker compose up --build
 ```
 
-The compose file sets health checks for both PostgreSQL (`pg_isready`) and RabbitMQ (`rabbitmq-diagnostics ping`) and restarts all services unless stopped manually.
+The compose file sets health checks for PostgreSQL (`pg_isready`), RabbitMQ (`rabbitmq-diagnostics ping`), and Redis (`redis-cli ping`), and restarts all services unless stopped manually. The worker itself also exposes `/health` (Postgres/Redis/RabbitMQ) on a minimal web host at port 8090, alongside the existing `/metrics` listener on 8085.
 
 **Port mappings (compose):**
 
@@ -301,6 +314,17 @@ The compose file sets health checks for both PostgreSQL (`pg_isready`) and Rabbi
 | PostgreSQL | 5432 |
 | RabbitMQ AMQP | 5672 |
 | RabbitMQ Management UI | 15672 |
+| Redis | 6379 |
+| Worker `/metrics` (Prometheus) | 8085 |
+| Worker `/health` | 8090 |
+
+---
+
+## Code Quality & CI
+
+`.editorconfig` and `Directory.Build.props` enable `AnalysisLevel=latest`/`AnalysisMode=Recommended` with `TreatWarningsAsErrors`. `Directory.Build.props` documents the specific pre-existing warning rule IDs grandfathered in — nullable-safety warnings are not among them and fail the build if introduced.
+
+`.github/workflows/ci.yml` checks out both sibling repos (`ArbiScannerWebApp`, `ArbiScannerAdminPannel`) alongside this one — this `.slnx` references project files from both directly (see [Docker Build](#docker-build)) — then runs restore → build (with analyzers) → `ArbiScanner.TelegramNotifierApp.Tests` on every push. The root monorepo also has `.github/workflows/docker-build.yml`, since this Worker's Dockerfile needs repo-root build context.
 
 ---
 
