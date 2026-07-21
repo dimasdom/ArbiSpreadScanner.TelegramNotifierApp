@@ -8,6 +8,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       ConnectionStrings__PostgreSqlConnection: "Host=postgres;Port=5432;Database=ArbiScannerBot;Username=postgres;Password=REDACTED"
       RabbitMq__Host: "rabbitmq"
@@ -16,7 +18,13 @@ services:
       RabbitMq__Password: "guest"
       RabbitMq__Exchange: "spread_fanout_exchange"
       RabbitMq__RoutingKey: ""
+      Redis__Endpoint: "redis:6379"
       Telegram__BotToken: "${TELEGRAM_BOT_TOKEN}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - backend
     restart: unless-stopped
@@ -49,6 +57,19 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+    restart: unless-stopped
+
+  redis:
+    image: redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5

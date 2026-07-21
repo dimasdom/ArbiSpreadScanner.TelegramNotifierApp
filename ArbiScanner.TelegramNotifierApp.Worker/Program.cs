@@ -4,8 +4,11 @@ using ArbiScanner.TelegramNotifierApp.Domain.Settings;
 using ArbiScanner.TelegramNotifierApp.Worker.Worker;
 using ArbiScanner.TelegramNotifierApp.Worker.Worker.TelegramMessageController;
 using ArbiScannerWeb.Abstractions.Interfaces;
+using ArbiScannerWeb.Infrastructure.HealthChecks;
 using ArbiScannerWeb.Infrastructure.Services;
 using ArbiScannerWeb.Infrastructure.Settings;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +20,7 @@ using OpenTelemetry.Metrics;
 using ProtoBuf.Meta;
 using Serilog;
 using Serilog.Enrichers.Span;
+using StackExchange.Redis;
 using Telegram.Bot;
 
 Log.Logger = new LoggerConfiguration()
@@ -34,7 +38,12 @@ try
             services.AddHostedService<TelegramMessageController>();
 
             services.AddScoped<MainController>();
-            services.AddScoped<IRabbitMqService, RabbitMqService>();
+            services.AddSingleton<IRabbitMqService, RabbitMqService>();
+            services.AddSingleton<IConnectionMultiplexer>(sp =>
+            {
+                var redisEndpoint = context.Configuration["Redis:Endpoint"] ?? "localhost:6379";
+                return ConnectionMultiplexer.ConnectAsync(redisEndpoint).GetAwaiter().GetResult();
+            });
             services.AddScoped<ISpreadService, SpreadService>();
             services.AddSingleton<ITelegramBotClient>(_ =>
             {
@@ -56,6 +65,11 @@ try
             services.Configure<RabbitMqSettings>(context.Configuration.GetSection("RabbitMq"));
             services.Configure<TelegramSettings>(context.Configuration.GetSection("Telegram"));
 
+            services.AddHealthChecks()
+                .AddCheck<DbContextFactoryHealthCheck<AppDbContext>>("postgres")
+                .AddCheck<RedisHealthCheck>("redis")
+                .AddCheck<RabbitMqHealthCheck>("rabbitmq");
+
             services.AddOpenTelemetry()
                 .ConfigureResource(r => r.AddService("arbiscanner-telegram-notifier", serviceVersion: "1.0.0"))
                 .WithTracing(tracing => tracing
@@ -70,6 +84,11 @@ try
                     {
                         o.UriPrefixes = ["http://+:8085/"];
                     }));
+        })
+        .ConfigureWebHostDefaults(webBuilder =>
+        {
+            webBuilder.UseUrls("http://+:8090");
+            webBuilder.Configure(app => app.UseHealthChecks("/health"));
         })
         .Build();
 

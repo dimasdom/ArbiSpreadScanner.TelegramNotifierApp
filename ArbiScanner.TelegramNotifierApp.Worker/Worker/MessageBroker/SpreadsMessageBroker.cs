@@ -60,39 +60,27 @@ public class SpreadsMessageBroker : BackgroundService
         }
     }
 
-    private Task ProcessMessageAsync(TradeOpportunityModel possiblePosition)
+    private async Task ProcessMessageAsync(TradeOpportunityModel possiblePosition)
     {
-        _ = Task.Run(async () =>
+        using var scope = _serviceScopeFactory.CreateScope();
+        var spreadService = scope.ServiceProvider.GetRequiredService<ISpreadService>();
+
+        switch (possiblePosition.ActionType)
         {
-            try
-            {
-                using var scope = _serviceScopeFactory.CreateScope();
-                var spreadService = scope.ServiceProvider.GetRequiredService<ISpreadService>();
+            case MarketPositionAction.Open:
+                await spreadService.HandleNewSpread(possiblePosition);
+                break;
+            case MarketPositionAction.Update:
+                _logger.LogInformation("Received update for spread: {Guid}", possiblePosition.Guid);
+                break;
+            case MarketPositionAction.Close:
+                await spreadService.HandleCloseSpread(possiblePosition);
+                break;
+            default:
+                _logger.LogWarning("Unknown action type: {ActionType}", possiblePosition.ActionType);
+                return;
+        }
 
-                switch (possiblePosition.ActionType)
-                {
-                    case MarketPositionAction.Open:
-                        await spreadService.HandleNewSpread(possiblePosition);
-                        break;
-                    case MarketPositionAction.Update:
-                        _logger.LogInformation("Received update for spread: {Guid}", possiblePosition.Guid);
-                        break;
-                    case MarketPositionAction.Close:
-                        await spreadService.HandleCloseSpread(possiblePosition);
-                        break;
-                    default:
-                        _logger.LogWarning("Unknown action type: {ActionType}", possiblePosition.ActionType);
-                        return;
-                }
-
-                _logger.LogInformation("Processed message: {ActionType}", possiblePosition.ActionType);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error processing RabbitMQ message");
-            }
-        });
-
-        return Task.CompletedTask;
+        _logger.LogInformation("Processed message: {ActionType}", possiblePosition.ActionType);
     }
 }
