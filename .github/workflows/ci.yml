@@ -13,18 +13,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          path: ArbiScanner.TelegramNotifierApp
 
       - name: Checkout sibling ArbiScannerWebApp (cross-submodule project reference)
         uses: actions/checkout@v4
         with:
           repository: dimasdom/ArbiSpreadScanner.WebApp
-          path: ../ArbiScannerWebApp
+          path: ArbiScannerWebApp
 
       - name: Checkout sibling ArbiScannerAdminPannel (cross-submodule project reference)
         uses: actions/checkout@v4
         with:
           repository: dimasdom/ArbiSpreadScanner.AdminPannel
-          path: ../ArbiScannerAdminPannel
+          path: ArbiScannerAdminPannel
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -32,12 +34,15 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Restore
+        working-directory: ArbiScanner.TelegramNotifierApp
         run: dotnet restore ArbiScanner.slnx
 
       - name: Build (with analyzers)
+        working-directory: ArbiScanner.TelegramNotifierApp
         run: dotnet build ArbiScanner.slnx --no-restore --configuration Release
 
       - name: Unit tests
+        working-directory: ArbiScanner.TelegramNotifierApp
         run: >
           dotnet test ArbiScanner.TelegramNotifierApp.Tests/ArbiScanner.TelegramNotifierApp.Tests.csproj
           --no-restore --configuration Release
@@ -49,5 +54,5 @@ jobs:
         if: always()
         with:
           name: Test Results
-          path: "TestResults/*.trx"
+          path: "ArbiScanner.TelegramNotifierApp/TestResults/*.trx"
           reporter: dotnet-trx
