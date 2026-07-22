@@ -54,5 +54,6 @@ jobs:
         if: always()
         with:
           name: Test Results
-          path: "ArbiScanner.TelegramNotifierApp/TestResults/*.trx"
+          working-directory: ArbiScanner.TelegramNotifierApp
+          path: "TestResults/*.trx"
           reporter: dotnet-trx
