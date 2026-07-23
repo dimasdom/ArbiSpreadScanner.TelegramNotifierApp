@@ -1,6 +1,5 @@
 # ArbiScanner.TelegramNotifierApp
 
-> This submodule is part of the ArbiScanner monorepo. `docs/completed-work-summary.md`, referenced below, lives in that monorepo's root — not inside this repo.
 
 A .NET 10 background worker service that bridges the ArbiScanner platform with Telegram. It serves two purposes:
 
