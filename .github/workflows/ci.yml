@@ -9,12 +9,17 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           path: ArbiScanner.TelegramNotifierApp
+          fetch-depth: 0
 
       - name: Checkout sibling ArbiScannerWebApp (cross-submodule project reference)
         uses: actions/checkout@v4
@@ -33,6 +38,47 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      # SonarCloud is free for public repos (no paid license needed); requires a SONAR_TOKEN
+      # secret from the project's SonarCloud org, and /k /o below to match the imported project.
+      - name: Set up JDK for SonarCloud
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Install SonarCloud scanner
+        working-directory: ArbiScanner.TelegramNotifierApp
+        run: |
+          dotnet tool install --global dotnet-sonarscanner
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Begin SonarCloud analysis
+        working-directory: ArbiScanner.TelegramNotifierApp
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          dotnet-sonarscanner begin
+          /k:"dimasdom_ArbiSpreadScanner.TelegramNotifierApp"
+          /o:"dimasdom"
+          /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+          /d:sonar.host.url="https://sonarcloud.io"
+          /d:sonar.cs.vstest.reportsPaths="TestResults/*.trx"
+
+      # CodeQL is free for public GitHub repos, no external account/secrets needed.
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+          build-mode: manual
+          source-root: ArbiScanner.TelegramNotifierApp
+
       - name: Restore
         working-directory: ArbiScanner.TelegramNotifierApp
         run: dotnet restore ArbiScanner.slnx
@@ -48,6 +94,15 @@ jobs:
           --no-restore --configuration Release
           --logger "trx;LogFileName=unit-tests.trx"
           --results-directory ./TestResults
+
+      - name: End SonarCloud analysis
+        working-directory: ArbiScanner.TelegramNotifierApp
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
 
       - name: Publish test results
         uses: dorny/test-reporter@v1
