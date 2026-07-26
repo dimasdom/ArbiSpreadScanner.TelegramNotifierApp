@@ -1,7 +1,8 @@
 using ArbiScanner.TelegramNotifierApp.Application.Services;
 using ArbiScanner.TelegramNotifierApp.Abstractions.Interfaces.Services;
 using ArbiScanner.TelegramNotifierApp.Domain.Settings;
-using ArbiScanner.TelegramNotifierApp.Worker.Worker;
+using ArbiScanner.TelegramNotifierApp.Infrastructure.DbContext;
+using ArbiScanner.TelegramNotifierApp.Worker.Worker.MessageBroker;
 using ArbiScanner.TelegramNotifierApp.Worker.Worker.TelegramMessageController;
 using ArbiScannerWeb.Abstractions.Interfaces;
 using ArbiScannerWeb.Infrastructure.HealthChecks;

@@ -1,3 +1,4 @@
+using ArbiScanner.TelegramNotifierApp.Infrastructure.DbContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 

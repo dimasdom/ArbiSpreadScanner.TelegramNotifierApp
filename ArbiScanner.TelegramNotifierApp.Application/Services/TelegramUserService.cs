@@ -1,17 +1,13 @@
 using ArbiScanner.TelegramNotifierApp.Abstractions.Interfaces.Services;
+using ArbiScanner.TelegramNotifierApp.Infrastructure.DbContext;
 using ArbiScannerWeb.Domain.Models;
 using FluentResults;
 using Microsoft.EntityFrameworkCore;
 
 namespace ArbiScanner.TelegramNotifierApp.Application.Services;
-public class TelegramUserService : ITelegramUserService
+public class TelegramUserService(AppDbContext dbContext) : ITelegramUserService
 {
-    private readonly AppDbContext _dbContext;
-
-    public TelegramUserService(AppDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
+    private readonly AppDbContext _dbContext = dbContext;
 
     public async Task<Result> LinkTelegramUserWithAccount(string userName, long chatId, string linkId)
     {

@@ -1,23 +1,17 @@
 using ArbiScanner.TelegramNotifierApp.Abstractions.Interfaces.Services;
+using ArbiScanner.TelegramNotifierApp.Infrastructure.DbContext;
 using ArbiScannerWeb.Domain.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 namespace ArbiScanner.TelegramNotifierApp.Application.Services;
-public class SpreadService : ISpreadService
+public class SpreadService(
+    IDbContextFactory<AppDbContext> dbContextFactory,
+    ITelegramNotifierUserService telegramNotifierUserService,
+    ILogger<SpreadService> logger) : ISpreadService
 {
-    public readonly IDbContextFactory<AppDbContext> _dbContextFactory;
-    private readonly ITelegramNotifierUserService _telegramNotifierUserService;
-    private readonly ILogger<SpreadService> _logger;
-    public SpreadService(
-        IDbContextFactory<AppDbContext> dbContextFactory,
-        ITelegramNotifierUserService telegramNotifierUserService,
-        ILogger<SpreadService> logger)
-    {
-        _dbContextFactory = dbContextFactory;
-        _logger = logger;
-        _telegramNotifierUserService = telegramNotifierUserService;
-    }
-
+    public readonly IDbContextFactory<AppDbContext> _dbContextFactory = dbContextFactory;
+    private readonly ITelegramNotifierUserService _telegramNotifierUserService = telegramNotifierUserService;
+    private readonly ILogger<SpreadService> _logger = logger;
     public async Task HandleNewSpread(TradeOpportunityModel tradeOpportunityModel)
     {
         try

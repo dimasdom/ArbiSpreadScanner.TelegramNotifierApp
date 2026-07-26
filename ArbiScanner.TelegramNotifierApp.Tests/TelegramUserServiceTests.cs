@@ -1,4 +1,5 @@
 using ArbiScanner.TelegramNotifierApp.Application.Services;
+using ArbiScanner.TelegramNotifierApp.Infrastructure.DbContext;
 using ArbiScannerWeb.Domain.Models;
 using Xunit;
 

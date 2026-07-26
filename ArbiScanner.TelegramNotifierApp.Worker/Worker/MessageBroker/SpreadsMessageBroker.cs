@@ -6,22 +6,15 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ArbiScanner.TelegramNotifierApp.Abstractions.Interfaces.Services;
 using ArbiScannerWeb.Infrastructure.Services;
-namespace ArbiScanner.TelegramNotifierApp.Worker.Worker;
-public class SpreadsMessageBroker : BackgroundService
+namespace ArbiScanner.TelegramNotifierApp.Worker.Worker.MessageBroker;
+public class SpreadsMessageBroker(
+    IRabbitMqService rabbitMqService,
+    IServiceScopeFactory serviceScopeFactory,
+    ILogger<SpreadsMessageBroker> logger) : BackgroundService
 {
-    private readonly IRabbitMqService _rabbitMqService;
-    private readonly ILogger<SpreadsMessageBroker> _logger;
-    private readonly IServiceScopeFactory _serviceScopeFactory;
-
-    public SpreadsMessageBroker(
-        IRabbitMqService rabbitMqService,
-        IServiceScopeFactory serviceScopeFactory,
-        ILogger<SpreadsMessageBroker> logger)
-    {
-        _rabbitMqService = rabbitMqService;
-        _serviceScopeFactory = serviceScopeFactory;
-        _logger = logger;
-    }
+    private readonly IRabbitMqService _rabbitMqService = rabbitMqService;
+    private readonly ILogger<SpreadsMessageBroker> _logger = logger;
+    private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {

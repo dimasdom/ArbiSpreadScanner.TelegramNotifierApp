@@ -1,5 +1,6 @@
 using ArbiScanner.TelegramNotifierApp.Application.Services;
 using ArbiScanner.TelegramNotifierApp.Abstractions.Interfaces.Services;
+using ArbiScanner.TelegramNotifierApp.Infrastructure.DbContext;
 using ArbiScannerWeb.Domain.Models;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
