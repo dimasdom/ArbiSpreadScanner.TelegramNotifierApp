@@ -22,7 +22,7 @@ public class TelegramMessageController(IServiceProvider serviceProvider, IOption
         MainController mainController = _serviceProvider.GetRequiredService<MainController>();
         bot.StartReceiving(
             mainController.Index,
-            (botClient, exception, errorSource, ct) => MainController.HandleErrorAsync(botClient, exception, ct),
+            (_, exception, _, _) => MainController.HandleErrorAsync(exception),
             cancellationToken: cts.Token);
         return Task.CompletedTask;
     }

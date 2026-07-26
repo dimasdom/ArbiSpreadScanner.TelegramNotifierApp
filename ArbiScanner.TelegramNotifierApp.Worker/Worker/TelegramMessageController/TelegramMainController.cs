@@ -113,7 +113,7 @@ public class MainController(IServiceProvider serviceProvider)
             cancellationToken: token);
     }
 
-    public static Task HandleErrorAsync(ITelegramBotClient client, Exception ex, CancellationToken token)
+    public static Task HandleErrorAsync(Exception ex)
     {
         Console.WriteLine("Error: " + ex.Message);
         return Task.CompletedTask;
