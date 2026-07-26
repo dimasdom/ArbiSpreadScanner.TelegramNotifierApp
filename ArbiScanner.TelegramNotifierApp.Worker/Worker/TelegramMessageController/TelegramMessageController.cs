@@ -10,16 +10,10 @@ using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
 
 namespace ArbiScanner.TelegramNotifierApp.Worker.Worker.TelegramMessageController;
-public class TelegramMessageController : BackgroundService
+public class TelegramMessageController(IServiceProvider serviceProvider, IOptions<TelegramSettings> settings) : BackgroundService
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly IOptions<TelegramSettings> _settings;
-
-    public TelegramMessageController(IServiceProvider serviceProvider, IOptions<TelegramSettings> settings)
-    {
-        _serviceProvider = serviceProvider;
-        _settings = settings;
-    }
+    private readonly IServiceProvider _serviceProvider = serviceProvider;
+    private readonly IOptions<TelegramSettings> _settings = settings;
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {

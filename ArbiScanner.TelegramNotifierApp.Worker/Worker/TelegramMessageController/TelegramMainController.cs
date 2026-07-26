@@ -7,26 +7,21 @@ using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
-public class MainController
+public class MainController(IServiceProvider serviceProvider)
 {
     private const string ButtonResume = "▶️ Resume";
     private const string ButtonPause  = "⏸ Pause";
 
-    private static readonly ReplyKeyboardMarkup MainKeyboard = new(new[]
-    {
+    private static readonly ReplyKeyboardMarkup MainKeyboard = new(
+    [
         new KeyboardButton[] { new(ButtonResume), new(ButtonPause) }
-    })
+    ])
     {
         ResizeKeyboard  = true,
         OneTimeKeyboard = false
     };
 
-    private readonly IServiceProvider _serviceProvider;
-
-    public MainController(IServiceProvider serviceProvider)
-    {
-        _serviceProvider = serviceProvider;
-    }
+    private readonly IServiceProvider _serviceProvider = serviceProvider;
 
     public async Task Index(ITelegramBotClient botClient, Update update, CancellationToken token)
     {

@@ -3,18 +3,12 @@ using Microsoft.Extensions.Logging;
 using Telegram.Bot;
 
 namespace ArbiScanner.TelegramNotifierApp.Application.Services;
-public class TelegramNotifierUserService : ITelegramNotifierUserService
+public class TelegramNotifierUserService(
+    ITelegramBotClient telegramBotClient,
+    ILogger<TelegramNotifierUserService> logger) : ITelegramNotifierUserService
 {
-    private readonly ITelegramBotClient _telegramBotClient;
-    private readonly ILogger<TelegramNotifierUserService> _logger;
-
-    public TelegramNotifierUserService(
-        ITelegramBotClient telegramBotClient,
-        ILogger<TelegramNotifierUserService> logger)
-    {
-        _logger = logger;
-        _telegramBotClient = telegramBotClient;
-    }
+    private readonly ITelegramBotClient _telegramBotClient = telegramBotClient;
+    private readonly ILogger<TelegramNotifierUserService> _logger = logger;
 
     public async Task NotifyUser(long chatId, string message)
     {
