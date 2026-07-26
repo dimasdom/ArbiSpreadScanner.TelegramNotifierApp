@@ -75,19 +75,19 @@ public class SpreadService(
                     if (possiblePosition.ExchangeLong.FundingRateValue.HasValue)
                     {
                         double longFunding = possiblePosition.ExchangeLong.FundingRateValue.Value * 100;
-                        fundingForLong = $"\nFunding {possiblePosition.ExchangeLong.Exchange}:{longFunding.ToString("0.00")}%";
+                        fundingForLong = $"\nFunding {possiblePosition.ExchangeLong.Exchange}:{longFunding:0.00}%";
                     }
                     if (possiblePosition.ExchangeShort.FundingRateValue.HasValue)
                     {
                         double shortFunding = possiblePosition.ExchangeShort.FundingRateValue.Value * 100;
-                        fundingForShort = $"\nFunding {possiblePosition.ExchangeShort.Exchange}:{shortFunding.ToString("0.00")}%";
+                        fundingForShort = $"\nFunding {possiblePosition.ExchangeShort.Exchange}:{shortFunding:0.00}%";
                     }
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error handling funding rates: {Message}", ex.Message);
                 }
-                var message = $"Coin: {possiblePosition.ExchangeRateA.Symbol}\nSpread: {possiblePosition.Spread.ToString("0.00")}%\nLong: {possiblePosition.ExchangeLong.Exchange}({possiblePosition.ExchangeLong.ExchangeRate}$)\nShort: {possiblePosition.ExchangeShort.Exchange}({possiblePosition.ExchangeShort.ExchangeRate}$)\nSlippage {possiblePosition.ExchangeLong.Exchange}: {possiblePosition.ExchangeLong.SlippageShort.ToString("0.00")}%\nSlippage {possiblePosition.ExchangeShort.Exchange}: {possiblePosition.ExchangeShort.SlippageLong.ToString("0.00")}%\n{fundingForLong}{fundingForShort}";
+                var message = $"Coin: {possiblePosition.ExchangeRateA.Symbol}\nSpread: {possiblePosition.Spread:0.00}%\nLong: {possiblePosition.ExchangeLong.Exchange}({possiblePosition.ExchangeLong.ExchangeRate}$)\nShort: {possiblePosition.ExchangeShort.Exchange}({possiblePosition.ExchangeShort.ExchangeRate}$)\nSlippage {possiblePosition.ExchangeLong.Exchange}: {possiblePosition.ExchangeLong.SlippageShort:0.00}%\nSlippage {possiblePosition.ExchangeShort.Exchange}: {possiblePosition.ExchangeShort.SlippageLong:0.00}%\n{fundingForLong}{fundingForShort}";
                 return message;
             }
             catch (Exception ex)
@@ -108,19 +108,19 @@ public class SpreadService(
                     if (possiblePosition.ExchangeLong.FundingRateValue.HasValue)
                     {
                         double longFunding = possiblePosition.ExchangeLong.FundingRateValue.Value * 100;
-                        fundingForLong = $"\nFunding {possiblePosition.ExchangeLong.Exchange}:{longFunding.ToString("0.00")}%";
+                        fundingForLong = $"\nFunding {possiblePosition.ExchangeLong.Exchange}:{longFunding:0.00}%";
                     }
                     if (possiblePosition.ExchangeShort.FundingRateValue.HasValue)
                     {
                         double shortFunding = possiblePosition.ExchangeShort.FundingRateValue.Value * 100;
-                        fundingForShort = $"\nFunding {possiblePosition.ExchangeShort.Exchange}:{shortFunding.ToString("0.00")}%";
+                        fundingForShort = $"\nFunding {possiblePosition.ExchangeShort.Exchange}:{shortFunding:0.00}%";
                     }
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error handling funding rates: {Message}", ex.Message);
                 }
-                string message = $"Coin: {possiblePosition.ExchangeRateA.Symbol}\nFunding Spread: {possiblePosition.TotalFunding.ToString("0.00")}%\nRate spread: {rateSpread.ToString("0.00")}%\nLong: {possiblePosition.ExchangeLong.Exchange}({possiblePosition.ExchangeLong.ExchangeRate}$)\nShort: {possiblePosition.ExchangeShort.Exchange}({possiblePosition.ExchangeShort.ExchangeRate}$)\nSlippage {possiblePosition.ExchangeLong.Exchange}: {possiblePosition.ExchangeLong.SlippageShort.ToString("0.00")}%\nSlippage {possiblePosition.ExchangeShort.Exchange}: {possiblePosition.ExchangeShort.SlippageLong.ToString("0.00")}%{fundingForLong}{fundingForShort}";
+                string message = $"Coin: {possiblePosition.ExchangeRateA.Symbol}\nFunding Spread: {possiblePosition.TotalFunding:0.00}%\nRate spread: {rateSpread:0.00}%\nLong: {possiblePosition.ExchangeLong.Exchange}({possiblePosition.ExchangeLong.ExchangeRate}$)\nShort: {possiblePosition.ExchangeShort.Exchange}({possiblePosition.ExchangeShort.ExchangeRate}$)\nSlippage {possiblePosition.ExchangeLong.Exchange}: {possiblePosition.ExchangeLong.SlippageShort:0.00}%\nSlippage {possiblePosition.ExchangeShort.Exchange}: {possiblePosition.ExchangeShort.SlippageLong:0.00}%{fundingForLong}{fundingForShort}";
                 return message;
             }
             catch (Exception ex)
@@ -139,14 +139,14 @@ public class SpreadService(
                     if (possiblePosition.ExchangeShort.FundingRateValue.HasValue)
                     {
                         double shortFunding = possiblePosition.ExchangeShort.FundingRateValue.Value * 100;
-                        fundingForShort = $"\nFunding:{shortFunding.ToString("0.00")}%";
+                        fundingForShort = $"\nFunding:{shortFunding:0.00}%";
                     }
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error handling funding rates: {Message}", ex.Message);
                 }
-                string message = $"Coin: {possiblePosition.ExchangeRateA.Symbol}\nSpot Spread: {possiblePosition.Spread.ToString("0.00")}%\n{possiblePosition.ExchangeLong.Exchange} Spot: ({possiblePosition.ExchangeLong.ExchangeRate}$)\n{possiblePosition.ExchangeShort.Exchange} Futures: ({possiblePosition.ExchangeShort.ExchangeRate}$)\nSlippage Spot: {possiblePosition.ExchangeLong.SlippageShort.ToString("0.00")}%\nSlippage Futures: {possiblePosition.ExchangeShort.SlippageLong.ToString("0.00")}%{fundingForShort}\nPossible Profit:{possiblePosition.PossibleProfit.ToString("0.00")}%";
+                string message = $"Coin: {possiblePosition.ExchangeRateA.Symbol}\nSpot Spread: {possiblePosition.Spread:0.00}%\n{possiblePosition.ExchangeLong.Exchange} Spot: ({possiblePosition.ExchangeLong.ExchangeRate}$)\n{possiblePosition.ExchangeShort.Exchange} Futures: ({possiblePosition.ExchangeShort.ExchangeRate}$)\nSlippage Spot: {possiblePosition.ExchangeLong.SlippageShort:0.00}%\nSlippage Futures: {possiblePosition.ExchangeShort.SlippageLong:0.00}%{fundingForShort}\nPossible Profit:{possiblePosition.PossibleProfit:0.00}%";
                 return message;
             }
             catch (Exception ex)
