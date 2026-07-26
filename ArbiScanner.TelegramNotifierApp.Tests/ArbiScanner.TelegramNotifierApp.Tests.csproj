@@ -25,6 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="../ArbiScanner.TelegramNotifierApp.Application/ArbiScanner.TelegramNotifierApp.Application.csproj" />
     <ProjectReference Include="../ArbiScanner.TelegramNotifierApp.Infrastructure/ArbiScanner.TelegramNotifierApp.Infrastructure.csproj" />
+    <ProjectReference Include="../ArbiScanner.TelegramNotifierApp.Worker/ArbiScanner.TelegramNotifierApp.Worker.csproj" />
   </ItemGroup>
 
 </Project>
