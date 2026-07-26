@@ -49,20 +49,15 @@ try
             services.AddSingleton<ITelegramBotClient>(_ =>
             {
                 var botToken = context.Configuration["Telegram:BotToken"];
-                if (string.IsNullOrWhiteSpace(botToken))
-                {
-                    throw new InvalidOperationException("Telegram bot token is not configured.");
-                }
-
-                return new TelegramBotClient(botToken);
+                return string.IsNullOrWhiteSpace(botToken)
+                    ? throw new InvalidOperationException("Telegram bot token is not configured.")
+                    : new TelegramBotClient(botToken);
             });
             services.AddScoped<ITelegramNotifierUserService, TelegramNotifierUserService>();
             services.AddScoped<ITelegramUserService, ArbiScanner.TelegramNotifierApp.Application.Services.TelegramUserService>();
 
             services.AddDbContextFactory<AppDbContext>(options =>
-            {
-                options.UseNpgsql(context.Configuration.GetConnectionString("PostgreSqlConnection"));
-            });
+                options.UseNpgsql(context.Configuration.GetConnectionString("PostgreSqlConnection")));
             services.Configure<RabbitMqSettings>(context.Configuration.GetSection("RabbitMq"));
             services.Configure<TelegramSettings>(context.Configuration.GetSection("Telegram"));
 
@@ -81,10 +76,7 @@ try
                 .WithMetrics(metrics => metrics
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation()
-                    .AddPrometheusHttpListener(o =>
-                    {
-                        o.UriPrefixes = ["http://+:8085/"];
-                    }));
+                    .AddPrometheusHttpListener(o => o.UriPrefixes = ["http://+:8085/"]));
         })
         .ConfigureWebHostDefaults(webBuilder =>
         {
