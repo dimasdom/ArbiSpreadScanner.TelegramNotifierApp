@@ -66,17 +66,20 @@ try
                 .AddCheck<RedisHealthCheck>("redis")
                 .AddCheck<RabbitMqHealthCheck>("rabbitmq");
 
-            services.AddOpenTelemetry()
-                .ConfigureResource(r => r.AddService("arbiscanner-telegram-notifier", serviceVersion: "1.0.0"))
-                .WithTracing(tracing => tracing
-                    .AddHttpClientInstrumentation(o => o.RecordException = true)
-                    .AddEntityFrameworkCoreInstrumentation()
-                    .AddSource("RabbitMQ.Client.*")
-                    .AddOtlpExporter())
-                .WithMetrics(metrics => metrics
-                    .AddHttpClientInstrumentation()
-                    .AddRuntimeInstrumentation()
-                    .AddPrometheusHttpListener(o => o.UriPrefixes = ["http://+:8085/"]));
+            if (context.Configuration.GetValue("Observability:Enabled", true))
+            {
+                services.AddOpenTelemetry()
+                    .ConfigureResource(r => r.AddService("arbiscanner-telegram-notifier", serviceVersion: "1.0.0"))
+                    .WithTracing(tracing => tracing
+                        .AddHttpClientInstrumentation(o => o.RecordException = true)
+                        .AddEntityFrameworkCoreInstrumentation()
+                        .AddSource("RabbitMQ.Client.*")
+                        .AddOtlpExporter())
+                    .WithMetrics(metrics => metrics
+                        .AddHttpClientInstrumentation()
+                        .AddRuntimeInstrumentation()
+                        .AddPrometheusHttpListener(o => o.UriPrefixes = ["http://+:8085/"]));
+            }
         })
         .ConfigureWebHostDefaults(webBuilder =>
         {
