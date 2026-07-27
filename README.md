@@ -1,5 +1,5 @@
 # ArbiScanner.TelegramNotifierApp
-
+[![Quality gate](https://sonarcloud.io/api/project_badges/quality_gate?project=dimasdom_ArbiSpreadScanner.TelegramNotifierApp)](https://sonarcloud.io/summary/new_code?id=dimasdom_ArbiSpreadScanner.TelegramNotifierApp)
 
 A .NET 10 background worker service that bridges the ArbiScanner platform with Telegram. It serves two purposes:
 
