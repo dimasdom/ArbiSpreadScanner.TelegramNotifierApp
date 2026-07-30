@@ -73,6 +73,8 @@ jobs:
           /d:sonar.cs.opencover.reportsPaths="TestResults/**/coverage.opencover.xml"
           /d:sonar.projectBaseDir="$(pwd)"
           /d:sonar.exclusions="**/Program.cs,**/*.TelegramNotifierApp.Domain/Settings/**,**/*.TelegramNotifierApp.Infrastructure/DbContext/**,**/*.TelegramNotifierApp.Abstractions/Interfaces/**,**/ArbiScannerWebApp/**,**/ArbiScannerAdminPannel/**"
+          /d:sonar.qualitygate.wait=true
+          /d:sonar.qualitygate.timeout=300
 
       # CodeQL is free for public GitHub repos, no external account/secrets needed.
       - name: Initialize CodeQL
@@ -103,11 +105,7 @@ jobs:
         working-directory: ArbiScanner.TelegramNotifierApp
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: >
-          dotnet-sonarscanner end
-          /d:sonar.token="$SONAR_TOKEN"
-          /d:sonar.qualitygate.wait=true
-          /d:sonar.qualitygate.timeout=300
+        run: dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v4
