@@ -31,8 +31,18 @@ Log.Logger = new LoggerConfiguration()
 try
 {
     var host = Host.CreateDefaultBuilder(args)
-        .UseSerilog((ctx, cfg) => cfg.ReadFrom.Configuration(ctx.Configuration)
-            .Enrich.WithSpan())
+        .UseSerilog((ctx, cfg) =>
+        {
+            cfg.ReadFrom.Configuration(ctx.Configuration)
+               .Enrich.WithSpan();
+
+            // VerboseLogging:Enabled (VERBOSE_CONSOLE_LOGS in .env) raises the minimum
+            // level to Debug when console output is easier to check than Grafana/Loki.
+            if (ctx.Configuration.GetValue("VerboseLogging:Enabled", false))
+            {
+                cfg.MinimumLevel.Debug();
+            }
+        })
         .ConfigureServices((context, services) =>
         {
             services.AddHostedService<SpreadsMessageBroker>();
