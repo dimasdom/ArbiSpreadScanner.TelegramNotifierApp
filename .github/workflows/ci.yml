@@ -103,7 +103,11 @@ jobs:
         working-directory: ArbiScanner.TelegramNotifierApp
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+        run: >
+          dotnet-sonarscanner end
+          /d:sonar.token="$SONAR_TOKEN"
+          /d:sonar.qualitygate.wait=true
+          /d:sonar.qualitygate.timeout=300
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v4

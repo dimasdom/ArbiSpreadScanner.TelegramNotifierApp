@@ -1,0 +1,48 @@
+name: Deploy
+
+# Manual on-demand deploy: runs unit tests (no integration test project exists
+# for this service), enforces the SonarCloud quality gate, and only on success
+# builds+pushes the Docker image to GHCR and restarts telegram-notifier on the
+# VPS. See the reusable workflow (dimasdom/SpreadScanner/.github/workflows/deploy-service.yml)
+# for the full job graph and scripts/deploy-remote.sh for the VPS-side restart
+# logic. Needs both sibling repos checked out for its Docker build (Worker
+# references ArbiScannerWebApp and ArbiScannerAdminPanel projects - see CLAUDE.md).
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run tests/build/push but skip the VPS deploy step"
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    permissions:
+      contents: read
+      packages: write
+    uses: dimasdom/SpreadScanner/.github/workflows/deploy-service.yml@master
+    with:
+      self_checkout_path: ArbiScanner.TelegramNotifierApp
+      sonar_project_key: dimasdom_ArbiSpreadScanner.TelegramNotifierApp
+      solution_file: ArbiScanner.slnx
+      unit_test_project: ArbiScanner.TelegramNotifierApp.Tests/ArbiScanner.TelegramNotifierApp.Tests.csproj
+      integration_test_project: ""
+      sonar_begin_extra_args: >-
+        /d:sonar.projectBaseDir="$(pwd)"
+        /d:sonar.exclusions="**/Program.cs,**/*.TelegramNotifierApp.Domain/Settings/**,**/*.TelegramNotifierApp.Infrastructure/DbContext/**,**/*.TelegramNotifierApp.Abstractions/Interfaces/**,**/ArbiScannerWebApp/**,**/ArbiScannerAdminPannel/**"
+      sibling_repos: >-
+        [{"repo":"dimasdom/ArbiSpreadScanner.WebApp","path":"ArbiScannerWebApp"},
+         {"repo":"dimasdom/ArbiSpreadScanner.AdminPannel","path":"ArbiScannerAdminPannel"}]
+      images: >-
+        [{"name":"arbiscanner-telegram-notifier","dockerfile":"ArbiScanner.TelegramNotifierApp/Dockerfile","context":".","needs_root_checkout":false,"build_args":""}]
+      deploy_services: "telegram-notifier"
+      image_tag_vars: '{"telegram-notifier":"TELEGRAM_NOTIFIER_IMAGE_TAG"}'
+      dry_run: ${{ inputs.dry_run }}
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+      VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+      VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
