@@ -19,7 +19,7 @@ A .NET 10 background worker service that bridges the ArbiScanner platform with T
 - [Running Locally](#running-locally)
 - [Environment Variables](#environment-variables)
 - [Docker Build](#docker-build)
-- [Code Quality & CI](#code-quality--ci)
+- [CI/CD](#cicd)
 - [Testing](#testing)
 - [Project Structure](#project-structure)
 
@@ -319,11 +319,31 @@ The compose file sets health checks for PostgreSQL (`pg_isready`), RabbitMQ (`ra
 
 ---
 
-## Code Quality & CI
+## CI/CD
 
 `.editorconfig` and `Directory.Build.props` enable `AnalysisLevel=latest`/`AnalysisMode=Recommended` with `TreatWarningsAsErrors`. `Directory.Build.props` documents the specific pre-existing warning rule IDs grandfathered in — nullable-safety warnings are not among them and fail the build if introduced.
 
-`.github/workflows/ci.yml` checks out both sibling repos (`ArbiScannerWebApp`, `ArbiScannerAdminPannel`) alongside this one — this `.slnx` references project files from both directly (see [Docker Build](#docker-build)) — then runs restore → build (with analyzers) → `ArbiScanner.TelegramNotifierApp.Tests` on every push. The root monorepo also has `.github/workflows/docker-build.yml`, since this Worker's Dockerfile needs repo-root build context.
+This repo has its own GitHub Actions, independent of the monorepo root's Actions tab (it's a separate git remote — see the monorepo root's CI/CD section for how the two relate). Two workflows live under `.github/workflows/`: `ci.yml` and `deploy.yml` — there's no `load-test.yml` here, since this service has no public HTTP API to load-test.
+
+### `ci.yml` — build, test, quality gate
+
+Runs on every push/PR to `main`:
+
+1. Checks out this repo into `ArbiScanner.TelegramNotifierApp/` plus both sibling repos — `ArbiScannerWebApp` into `ArbiScannerWebApp/` and `ArbiScannerAdminPannel` into `ArbiScannerAdminPannel/` — since this `.slnx` references project files from both directly (`ArbiScannerAdminPanel.Infrastructure`, `ArbiScannerWeb.Abstractions`, `ArbiScannerWeb.Domain` — see [Docker Build](#docker-build) and [Project Layer Responsibilities](#project-layer-responsibilities)).
+2. A SonarCloud scan (project `dimasdom_ArbiSpreadScanner.TelegramNotifierApp`) wraps everything below, excluding both sibling checkouts from analysis (`**/ArbiScannerWebApp/**`, `**/ArbiScannerAdminPannel/**` — each is scanned by its own repo's CI); `sonar.qualitygate.wait=true` fails the job on a red quality gate.
+3. CodeQL (`build-mode: manual`, `source-root: ArbiScanner.TelegramNotifierApp`) analyzes only this repo's C# code, not the sibling checkouts.
+4. `dotnet restore`/`build` on `ArbiScanner.slnx` with analyzers, then `ArbiScanner.TelegramNotifierApp.Tests` (unit) with coverage collection feeding the SonarCloud scan. There's no integration test project for this service.
+5. `.trx` results are published as a check-run summary via `dorny/test-reporter`.
+
+Both SonarCloud and CodeQL are free for this public repo; SonarCloud additionally requires a `SONAR_TOKEN` secret.
+
+### `deploy.yml` — manual deploy to the VPS
+
+A `workflow_dispatch`-triggered workflow (optional `dry_run` boolean input) that calls the monorepo root's reusable `deploy-service.yml` (`dimasdom/SpreadScanner/.github/workflows/deploy-service.yml`, pinned to a specific commit SHA) with this repo's specifics: solution file, unit test project, an empty `integration_test_project` (none exists), the SonarCloud exclusion list, `sibling_repos` set to check out both `ArbiScannerWebApp` and `ArbiScannerAdminPannel` (needed by the Docker build — see [Docker Build](#docker-build)), and a single image spec (`arbiscanner-telegram-notifier`, build context `.`, repo root).
+
+End to end: unit tests + quality gate → build and push `ghcr.io/dimasdom/arbiscanner-telegram-notifier:latest` / `:sha-<commit>` to GHCR → (unless `dry_run: true`) SSH into the VPS and restart `telegram-notifier` via `scripts/deploy-remote.sh`. Requires `SONAR_TOKEN` plus `VPS_HOST`/`VPS_USER`/`VPS_SSH_KEY`/`VPS_SSH_PORT`/`VPS_DEPLOY_PATH` secrets on this repo.
+
+The root monorepo also has `.github/workflows/docker-build.yml`, since this Worker's Dockerfile needs repo-root build context — it builds this service's image alongside the other three on every push/PR to `master`, as a build-breakage smoke check separate from this repo's own CI.
 
 ---
 
