@@ -76,7 +76,16 @@ public class MainController(IServiceProvider serviceProvider)
         await using var scope = _serviceProvider.CreateAsyncScope();
         var userService = scope.ServiceProvider.GetRequiredService<ITelegramUserService>();
 
-        await userService.UpdateTelegramUserActiveStatus(chatId, active);
+        var res = await userService.UpdateTelegramUserActiveStatus(chatId, active);
+        if (res.IsFailed)
+        {
+            await botClient.SendMessage(
+                chatId,
+                $"Failed to update notification status: {res.Errors.FirstOrDefault()?.Message ?? "Unknown error"}. Please link your account again.",
+                replyMarkup: new ReplyKeyboardRemove(),
+                cancellationToken: token);
+            return;
+        }
 
         var statusText = active ? "Notifications resumed ▶️" : "Notifications paused ⏸";
         await botClient.SendMessage(
