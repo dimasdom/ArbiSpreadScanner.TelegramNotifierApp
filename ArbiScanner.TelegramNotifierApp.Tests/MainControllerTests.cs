@@ -92,6 +92,19 @@ public class MainControllerTests
     }
 
     [Fact]
+    public async Task Index_ResumeButtonText_FailedUpdate_SendsFailureMessageWithErrorText()
+    {
+        const long chatId = 560;
+        _userService.UpdateTelegramUserActiveStatus(chatId, true).Returns(Task.FromResult(Result.Fail("account not linked")));
+
+        await _sut.Index(_botClient, TextUpdate(chatId, "▶️ Resume"), CancellationToken.None);
+
+        await _userService.Received(1).UpdateTelegramUserActiveStatus(chatId, true);
+        var request = await AssertSentMessage(chatId);
+        Assert.Contains("account not linked", request.Text);
+    }
+
+    [Fact]
     public async Task Index_PauseButtonText_DeactivatesUserAndSendsConfirmation()
     {
         const long chatId = 556;

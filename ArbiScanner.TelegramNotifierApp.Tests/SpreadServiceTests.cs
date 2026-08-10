@@ -11,13 +11,14 @@ namespace ArbiScanner.TelegramNotifierApp.Tests;
 public class SpreadServiceTests
 {
     private readonly SpreadService _sut;
+    private readonly TestLogger<SpreadService> _logger;
 
     public SpreadServiceTests()
     {
         var factory = Substitute.For<IDbContextFactory<AppDbContext>>();
         var notifier = Substitute.For<ITelegramNotifierUserService>();
-        var logger = new TestLogger<SpreadService>();
-        _sut = new SpreadService(factory, notifier, logger);
+        _logger = new TestLogger<SpreadService>();
+        _sut = new SpreadService(factory, notifier, _logger);
     }
 
     private static TradeOpportunityModel MakeSpotModel(double spread) => new()
@@ -76,5 +77,18 @@ public class SpreadServiceTests
     {
         var msg = _sut.MessageConstructorSpot(MakeSpotModel(2.5));
         Assert.DoesNotContain("Funding:", msg);
+    }
+
+    [Fact]
+    public void MessageConstructorSpot_NullExchangeShort_LogsErrorsAndReturnsEmpty()
+    {
+        var model = MakeSpotModel(2.5);
+        model.ExchangeShort = null!;
+
+        var msg = _sut.MessageConstructorSpot(model);
+
+        Assert.Equal(string.Empty, msg);
+        Assert.Contains(_logger.Entries, e => e.Message.Contains("Error handling funding rates"));
+        Assert.Contains(_logger.Entries, e => e.Message.Contains("Error constructing message for possible position"));
     }
 }

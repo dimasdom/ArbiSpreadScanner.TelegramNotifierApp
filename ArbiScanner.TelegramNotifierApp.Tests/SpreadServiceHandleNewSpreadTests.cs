@@ -154,4 +154,57 @@ public class SpreadServiceHandleNewSpreadTests
 
         Assert.Contains(_logger.Entries, e => e.Message.Contains("Error handling new spread"));
     }
+
+    [Theory]
+    [InlineData(SpreadType.Futures)]
+    [InlineData(SpreadType.Funding)]
+    public async Task HandleNewSpread_FundingRatesPresent_IncludesFundingLineInMessage(SpreadType type)
+    {
+        var (sut, seed) = CreateSut();
+        using (seed)
+        {
+            seed.UserSettings.Add(MakeUser(chatId: 666, accountId: "acc-6"));
+            await seed.SaveChangesAsync();
+        }
+        var model = MakeModel(type);
+        model.ExchangeLong.FundingRateValue = 0.01;
+        model.ExchangeShort.FundingRateValue = -0.02;
+
+        await sut.HandleNewSpread(model);
+
+        await _notifier.Received(1).NotifyUser(666, Arg.Is<string>(m => m.Contains("Funding")));
+    }
+
+    [Theory]
+    [InlineData(SpreadType.Futures)]
+    [InlineData(SpreadType.Funding)]
+    public async Task HandleNewSpread_MessageConstructionThrows_LogsErrorsAndNotifiesWithEmptyMessage(SpreadType type)
+    {
+        var (sut, seed) = CreateSut();
+        using (seed)
+        {
+            seed.UserSettings.Add(MakeUser(chatId: 777, accountId: "acc-7"));
+            await seed.SaveChangesAsync();
+        }
+        var model = MakeModel(type);
+        model.ExchangeLong = null!;
+
+        await sut.HandleNewSpread(model);
+
+        Assert.Contains(_logger.Entries, e => e.Message.Contains("Error handling funding rates"));
+        Assert.Contains(_logger.Entries, e => e.Message.Contains("Error constructing message for possible position"));
+        await _notifier.Received(1).NotifyUser(777, string.Empty);
+    }
+
+    [Fact]
+    public async Task HandleCloseSpread_CompletesSuccessfully()
+    {
+        var factory = Substitute.For<IDbContextFactory<AppDbContext>>();
+        var sut = new SpreadService(factory, _notifier, _logger);
+
+        var task = sut.HandleCloseSpread(MakeModel(SpreadType.Spot));
+        await task;
+
+        Assert.True(task.IsCompletedSuccessfully);
+    }
 }
