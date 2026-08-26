@@ -60,8 +60,9 @@ public static class TelegramSendResiliencePipeline
 
     // Decides both what the retry loop attempts again and what counts toward tripping the
     // circuit breaker - a flood of "user blocked the bot" 403s at scale is expected and must
-    // not look like Telegram itself degrading.
-    private static bool IsTransientFailure(Exception ex) => ex switch
+    // not look like Telegram itself degrading. Public (like IsPermanent) so the classification
+    // itself is unit-testable without waiting through real Polly retry/backoff timing.
+    public static bool IsTransientFailure(Exception ex) => ex switch
     {
         ApiRequestException { ErrorCode: 403 or 400 } => false,
         BrokenCircuitException => false,

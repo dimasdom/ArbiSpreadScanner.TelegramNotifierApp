@@ -232,6 +232,34 @@ public class SpreadServiceHandleNewSpreadTests
     }
 
     [Fact]
+    public async Task HandleNewSpread_UserAlreadyDeactivatedConcurrently_DeactivationIsNoOp()
+    {
+        // Simulates two permanent failures for the same user racing: by the time this run's
+        // cleanup pass queries for still-active permanently-failed users, another in-flight
+        // HandleNewSpread call has already flipped Active to false. The "&& u.Active" guard in
+        // DeactivateUnreachableUsersAsync should make the second pass a no-op, not a duplicate log.
+        var (sut, seed, options) = CreateSut();
+        using (seed)
+        {
+            seed.UserSettings.Add(MakeUser(chatId: 1111, accountId: "acc-11"));
+            await seed.SaveChangesAsync();
+        }
+        _notifier.NotifyUser(1111, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(async _ =>
+            {
+                using var racingContext = new AppDbContext(options);
+                var user = await racingContext.UserSettings.SingleAsync(u => u.ChatId == 1111);
+                user.Active = false;
+                await racingContext.SaveChangesAsync();
+                return Result.Fail(new PermanentDeliveryError("Forbidden: bot was blocked by the user"));
+            });
+
+        await sut.HandleNewSpread(MakeModel(SpreadType.Spot));
+
+        Assert.DoesNotContain(_logger.Entries, e => e.Message.Contains("Deactivated") && e.Message.Contains("permanent Telegram delivery failures"));
+    }
+
+    [Fact]
     public async Task HandleNewSpread_TransientDeliveryFailure_LogsWarningAndKeepsUserActive()
     {
         var (sut, seed, _) = CreateSut();
