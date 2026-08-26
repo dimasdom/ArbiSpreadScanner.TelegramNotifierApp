@@ -18,6 +18,7 @@ using Microsoft.Extensions.Logging;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using OpenTelemetry.Metrics;
+using Polly;
 using ProtoBuf.Meta;
 using Serilog;
 using Serilog.Enrichers.Span;
@@ -63,6 +64,7 @@ try
                     ? throw new InvalidOperationException("Telegram bot token is not configured.")
                     : new TelegramBotClient(botToken);
             });
+            services.AddSingleton(_ => TelegramSendResiliencePipeline.Create());
             services.AddScoped<ITelegramNotifierUserService, TelegramNotifierUserService>();
             services.AddScoped<ITelegramUserService, ArbiScanner.TelegramNotifierApp.Application.Services.TelegramUserService>();
 
