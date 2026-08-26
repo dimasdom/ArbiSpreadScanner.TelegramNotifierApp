@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/dimasdom/ArbiSpreadScanner.TelegramNotifierApp/compare/v1.0.0...v1.1.0) (2026-08-26)
+
+
+### Features
+
+* harden spread notification delivery with rate limiting and retry ([#2](https://github.com/dimasdom/ArbiSpreadScanner.TelegramNotifierApp/issues/2)) ([417ae06](https://github.com/dimasdom/ArbiSpreadScanner.TelegramNotifierApp/commit/417ae067c20182b3de4113b574809995add3bad8))
+
 ## 1.0.0 (2026-08-10)
 
 
