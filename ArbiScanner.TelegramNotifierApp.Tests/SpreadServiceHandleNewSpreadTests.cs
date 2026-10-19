@@ -155,9 +155,9 @@ public class SpreadServiceHandleNewSpreadTests
         await _notifier.DidNotReceive().NotifyUser(Arg.Any<long>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
-    // DB/query setup failures must propagate (not be swallowed) so the RabbitMQ-level retry
-    // pipeline and dead-letter queue - which only engage on an exception from the message
-    // handler - actually get a chance to redeliver or DLQ the message. A per-recipient send
+    // DB/query setup failures must propagate (not be swallowed) so the Kafka consumer's retry
+    // and dead-letter handling - which only engage on an exception from the message
+    // handler - actually get a chance to retry or dead-letter the message. A per-recipient send
     // failure, by contrast, must never surface as an exception here (see the permanent/transient
     // failure tests below): only genuine batch-setup failures should.
     [Fact]

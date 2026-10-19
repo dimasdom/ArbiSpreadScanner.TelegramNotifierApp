@@ -48,14 +48,6 @@ try
         })
         .ConfigureServices((context, services) =>
         {
-            // RabbitMQ -> Kafka migration: in Kafka mode RabbitMQ is not consumed at all (see docs/architecture/kafka-migration-plan.md).
-            var consumerMode = context.Configuration.GetConsumerMode();
-            if (consumerMode != MessagingConsumerMode.Kafka)
-            {
-                services.AddHostedService<SpreadsMessageBroker>();
-                services.AddSingleton<IRabbitMqService, RabbitMqService>();
-            }
-
             services.AddHostedService<TelegramMessageController>();
 
             services.AddScoped<MainController>();
@@ -79,21 +71,12 @@ try
 
             services.AddDbContextFactory<AppDbContext>(options =>
                 options.UseNpgsql(context.Configuration.GetConnectionString("PostgreSqlConnection")));
-            services.Configure<RabbitMqSettings>(context.Configuration.GetSection("RabbitMq"));
             services.Configure<TelegramSettings>(context.Configuration.GetSection("Telegram"));
 
-            var healthChecks = services.AddHealthChecks()
+            services.AddHealthChecks()
                 .AddCheck<DbContextFactoryHealthCheck<AppDbContext>>("postgres")
-                .AddCheck<RedisHealthCheck>("redis");
-            // The broker that carries spread events gates health; the other one must not. (Shadow mode adds no Kafka check on purpose.)
-            if (consumerMode == MessagingConsumerMode.Kafka)
-            {
-                healthChecks.AddCheck<KafkaHealthCheck>("kafka");
-            }
-            else
-            {
-                healthChecks.AddCheck<RabbitMqHealthCheck>("rabbitmq");
-            }
+                .AddCheck<RedisHealthCheck>("redis")
+                .AddCheck<KafkaHealthCheck>("kafka");
 
             if (context.Configuration.GetValue("Observability:Enabled", true))
             {
@@ -102,13 +85,11 @@ try
                     .WithTracing(tracing => tracing
                         .AddHttpClientInstrumentation(o => o.RecordException = true)
                         .AddEntityFrameworkCoreInstrumentation()
-                        .AddSource("RabbitMQ.Client.*")
                         .AddSource(KafkaTelemetry.SourceName)
                         .AddOtlpExporter())
                     .WithMetrics(metrics => metrics
                         .AddHttpClientInstrumentation()
                         .AddRuntimeInstrumentation()
-                        .AddMeter(ParityMetrics.MeterName)
                         .AddMeter(ConsumerMetrics.MeterName)
                         .AddPrometheusHttpListener(o => o.UriPrefixes = ["http://+:8085/"]));
             }
