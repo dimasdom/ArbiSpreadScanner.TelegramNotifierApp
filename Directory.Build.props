@@ -9,4 +9,11 @@
     <NoWarn>$(NoWarn);CA1848;CA1305;CA1707;CA1805;CA1720;CA2016;CA1822;CA1869;IDE0044;CA1826;CA1725;CA1311;CA1310;CA1304;CA1050;NU1510;CA2201;CA1862;CA1861;CA1850;CA1816;CA1051;CA1001;CA1000;CA1873</NoWarn>
   </PropertyGroup>
 
+  <!-- Security pins. Both are transitive here (EF SqlServer -> SqlClient -> Pkcs via the WebApp domain project, and Xml via the Identity/Data Protection stack). The restored versions carry known advisories (NU1902/NU1903
+       fail the build because warnings are errors). Raise, never lower. -->
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.13" />
+  </ItemGroup>
+
 </Project>

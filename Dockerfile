@@ -21,6 +21,8 @@ COPY ArbiScannerWebApp/ArbiScannerWeb.Domain/ArbiScannerWeb.Domain.csproj \
      ArbiScannerWebApp/ArbiScannerWeb.Domain/
 COPY ArbiScannerWebApp/ArbiScannerWeb.Infrastructure/ArbiScannerWeb.Infrastructure.csproj \
      ArbiScannerWebApp/ArbiScannerWeb.Infrastructure/
+COPY ArbiScannerWebApp/ArbiScannerWeb.Messaging.Kafka/ArbiScannerWeb.Messaging.Kafka.csproj \
+     ArbiScannerWebApp/ArbiScannerWeb.Messaging.Kafka/
 
 # Copy ArbiScannerAdminPanel projects — Infrastructure is referenced by the Worker
 COPY ArbiScannerAdminPannel/ArbiScannerAdminPanel.Infrastructure/ArbiScannerAdminPanel.Infrastructure.csproj \
@@ -37,6 +39,7 @@ COPY ArbiScanner.TelegramNotifierApp/ ./ArbiScanner.TelegramNotifierApp/
 COPY ArbiScannerWebApp/ArbiScannerWeb.Abstractions/ ./ArbiScannerWebApp/ArbiScannerWeb.Abstractions/
 COPY ArbiScannerWebApp/ArbiScannerWeb.Domain/ ./ArbiScannerWebApp/ArbiScannerWeb.Domain/
 COPY ArbiScannerWebApp/ArbiScannerWeb.Infrastructure/ ./ArbiScannerWebApp/ArbiScannerWeb.Infrastructure/
+COPY ArbiScannerWebApp/ArbiScannerWeb.Messaging.Kafka/ ./ArbiScannerWebApp/ArbiScannerWeb.Messaging.Kafka/
 COPY ArbiScannerAdminPannel/ArbiScannerAdminPanel.Infrastructure/ ./ArbiScannerAdminPannel/ArbiScannerAdminPanel.Infrastructure/
 COPY ArbiScannerAdminPannel/ArbiScannerAdminPanel.Domain/ ./ArbiScannerAdminPannel/ArbiScannerAdminPanel.Domain/
 COPY ArbiScannerAdminPannel/ArbiScannerAdminPanel.Abstractions/ ./ArbiScannerAdminPannel/ArbiScannerAdminPanel.Abstractions/

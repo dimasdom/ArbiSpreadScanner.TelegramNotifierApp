@@ -3,7 +3,7 @@
 
 A .NET 10 background worker service that bridges the ArbiScanner platform with Telegram. It serves two purposes:
 
-1. **Spread notification delivery** — consumes spread events from a RabbitMQ fanout exchange and delivers formatted Telegram messages to every subscribed user whose filter criteria match the incoming opportunity.
+1. **Spread notification delivery** — consumes spread events from Kafka and delivers formatted Telegram messages to every subscribed user whose filter criteria match the incoming opportunity.
 2. **Telegram bot interaction** — runs a Telegram bot polling loop that lets users link or unlink their Telegram account to their ArbiScanner web account and control notification preferences without leaving Telegram.
 
 ---
@@ -12,7 +12,7 @@ A .NET 10 background worker service that bridges the ArbiScanner platform with T
 
 - [Overview](#overview)
 - [Telegram Bot Commands](#telegram-bot-commands)
-- [RabbitMQ Message Flow](#rabbitmq-message-flow)
+- [Kafka Message Flow](#kafka-message-flow)
 - [Project Layer Responsibilities](#project-layer-responsibilities)
 - [Technologies](#technologies)
 - [Prerequisites](#prerequisites)
@@ -29,7 +29,7 @@ A .NET 10 background worker service that bridges the ArbiScanner platform with T
 
 ArbiScanner.TelegramNotifierApp is a standalone worker process that runs alongside the ArbiScanner web application. It shares the `ArbiScannerBot` PostgreSQL database with the web app and reads user configuration (linked chat IDs, exchange filters, spread-size thresholds, and notification preferences) from that shared store.
 
-When a new spread opportunity is detected by the core scanner engine, the engine publishes a protobuf-serialized `TradeOpportunityModel` message to a RabbitMQ fanout exchange. This service consumes those messages, evaluates each user's stored criteria against the incoming opportunity, constructs a formatted message, and sends it to every qualifying user via the Telegram Bot API.
+When a new spread opportunity is detected by the core scanner engine, the engine publishes protobuf-serialized `TradeOpportunityModel` messages (an `Open`, then `Update`s, then a `Close` for each spread) to the Kafka `spreads` topic. This service consumes them in its own consumer group, `telegram-spreads`, evaluates each user's stored criteria against the incoming opportunity, constructs a formatted message, and sends it to every qualifying user via the Telegram Bot API.
 
 In parallel, a second hosted service runs the Telegram bot polling loop. Users send commands or link codes to the bot, and the service resolves those interactions through the same shared database.
 
@@ -57,22 +57,20 @@ The account linking flow:
 
 ---
 
-## RabbitMQ Message Flow
+## Kafka Message Flow
 
 ```
 ArbiScanner scanner engine
         |
-        | publishes TradeOpportunityModel (protobuf)
+        | publishes TradeOpportunityModel (protobuf), key = spread identity,
+        | headers: message-id, traceparent, message-type, schema-version
         v
-spread_fanout_exchange  (type: fanout)
+Kafka topic: spreads  (events of one spread stay in order on one partition)
         |
-        | bound queue
-        v
-spread_telegram  (durable queue, dead-letters to spread_telegram_dlq)
-        |
-        | consumed by SpreadsMessageBroker (BackgroundService), via the shared
-        | RabbitMqService (see below) — dedupes, retries, acks only after this
-        | actually finishes, not before
+        | consumed in group telegram-spreads by KafkaConsumerService
+        | (ArbiScannerWeb.Messaging.Kafka, shared with the WebApp) which hands
+        | each message to TelegramSpreadKafkaHandler. Offsets are committed
+        | after processing; a failure is retried 3x, then dead-lettered.
         v
 ISpreadService.HandleNewSpread / HandleCloseSpread
         |
@@ -89,11 +87,17 @@ ITelegramNotifierUserService.NotifyUser (per matching chat ID)
 Telegram Bot API  ->  user's Telegram client
 ```
 
-**Exchange topology:**
-- Exchange name: `spread_fanout_exchange`
-- Exchange type: fanout
-- Queue: `spread_telegram`
-- Routing key: (empty — fanout ignores routing keys)
+**Delivery guarantees.** Alerts are user-visible and cannot be undone, so `TelegramSpreadKafkaHandler` guards every `Open` twice before sending anything:
+
+- **Duplicates:** a redelivery (after a crash or rebalance) with an already-processed `message-id` is skipped. The claim is a two-state Redis key `spread-dedupe:telegram:{message-id}` — `processing` for 60 s, `done` for 15 min — so a crash mid-send is retried rather than treated as a duplicate.
+- **Replay:** an `Open` whose producer timestamp is older than `Messaging__Consumer__MaxOpenAlertAgeMinutes` (default 10) is dropped, so an outage or an offset reset never re-alerts users about spreads that no longer exist.
+
+A message that can never succeed (undecodable payload, missing `message-id`, unknown action) skips the retries and goes straight to `spreads.dlq` with the error in its headers; the partition moves on.
+
+**Topology:**
+- Topic: `spreads` (and `spreads.dlq`), created by the monorepo's `kafka-init` job — broker auto-creation is off
+- Consumer group: `telegram-spreads` (derived from `Messaging__ServiceName=telegram`)
+- Key: `{type}:{exchangeLo}:{exchangeHi}:{pair}`
 - Message format: protobuf-serialized `TradeOpportunityModel`
 
 **Message action types handled:**
@@ -101,7 +105,7 @@ Telegram Bot API  ->  user's Telegram client
 | `ActionType` | Handler behaviour |
 |---|---|
 | `Open` | Constructs a formatted message and notifies all matching users. |
-| `Update` | Logged and skipped (no notification sent). |
+| `Update` | Ignored (no notification sent, and no Redis traffic). |
 | `Close` | Logged to console; currently a no-op for notifications. |
 
 **Message formats by spread type:**
@@ -126,7 +130,7 @@ Contains POCO configuration models. The only model at this layer is `TelegramSet
 
 Defines the service contracts consumed by upper layers:
 
-- `ISpreadService` — `HandleNewSpread(TradeOpportunityModel)` and `HandleCloseSpread(TradeOpportunityModel)`. Called by the RabbitMQ consumer when a spread message arrives.
+- `ISpreadService` — `HandleNewSpread(TradeOpportunityModel)` and `HandleCloseSpread(TradeOpportunityModel)`. Called by `TelegramSpreadKafkaHandler` when a spread message arrives.
 - `ITelegramNotifierUserService` — `NotifyUser(long chatId, string message)`. Sends a single Telegram message to one chat ID.
 - `ITelegramUserService` — `LinkTelegramUserWithAccount`, `UnlinkTelegramUser`, and `UpdateTelegramUserActiveStatus`. Manages the Telegram-to-account association in the database.
 
@@ -154,12 +158,12 @@ Entry point and host. `Program.cs` wires up all DI registrations and starts the 
 
 Two hosted services run concurrently:
 
-- **`SpreadsMessageBroker`** (`Worker/MessageBroker/`) — a `BackgroundService` that connects to RabbitMQ, binds to the fanout exchange queue, and dispatches each received protobuf message to `ISpreadService`. If the *connection* itself fails, it stops the consumer, waits five seconds, and reconnects. Message-level retry, dead-lettering, and idempotency all live one layer down, in the shared `RabbitMqService` (`ArbiScannerWeb.Infrastructure`, referenced via project reference — the same class the WebApp uses): it awaits `ISpreadService`'s handler fully before acking (previously it fired the handler via `Task.Run` and acked immediately, so a message could be acked before it was actually processed), retries transient failures with Polly, dead-letters after exhausting retries instead of requeuing forever, and de-duplicates redelivered messages via a Redis `SET NX` claim.
+- **`TelegramSpreadKafkaHandler`** (`Worker/MessageBroker/`) — the handler `KafkaConsumerService` calls for each message (resolved from a fresh DI scope per message). It decodes the protobuf payload, applies the two guards described under [Kafka Message Flow](#kafka-message-flow), and dispatches `Open` to `ISpreadService.HandleNewSpread` and `Close` to `HandleCloseSpread`. The consumer loop itself — subscribing, committing offsets after processing, retrying, dead-lettering — lives in the shared `ArbiScannerWeb.Messaging.Kafka` project (project reference; the same code the WebApp uses).
 - **`TelegramMessageController`** (`Worker/TelegramMessageController/`) — a `BackgroundService` that instantiates a `TelegramBotClient` and starts long-polling via `StartReceiving`. Each received update is dispatched to `MainController.Index`, which routes text messages to the appropriate handler (link code, resume, pause, or fallback).
 
 Also references: `ArbiScannerAdminPanel.Infrastructure` (shared DbContext and models), `ArbiScannerWeb.Abstractions`, `ArbiScannerWeb.Domain`.
 
-Packages: `Telegram.Bot`, `RabbitMQ.Client`, `Serilog` with `Serilog.Sinks.GrafanaLoki`, `Microsoft.EntityFrameworkCore` (SQL Server + PostgreSQL providers).
+Packages: `Telegram.Bot`, `Serilog` with `Serilog.Sinks.GrafanaLoki`, `Microsoft.EntityFrameworkCore` (SQL Server + PostgreSQL providers).
 
 ---
 
@@ -169,13 +173,13 @@ Packages: `Telegram.Bot`, `RabbitMQ.Client`, `Serilog` with `Serilog.Sinks.Grafa
 |---|---|
 | .NET 10 | Runtime and generic host |
 | Telegram.Bot 22.x | Telegram Bot API client (polling mode) |
-| RabbitMQ.Client | AMQP consumer for spread events |
+| Confluent.Kafka (via `ArbiScannerWeb.Messaging.Kafka`) | Kafka consumer for spread events |
 | protobuf-net | Deserializing `TradeOpportunityModel` messages |
 | Entity Framework Core 10 | ORM for PostgreSQL |
 | Npgsql | PostgreSQL driver for EF Core |
-| StackExchange.Redis | Idempotency dedupe for redelivered RabbitMQ messages (via the shared `RabbitMqService`) — this service had no Redis dependency before |
-| Polly.Core | Retry (exponential backoff + jitter) around message processing, via the shared `RabbitMqService` |
-| Microsoft.Extensions.Diagnostics.HealthChecks | Postgres/Redis/RabbitMQ checks exposed at `/health` on a minimal web host (port 8090), alongside the existing `/metrics` listener on 8085 |
+| StackExchange.Redis | Duplicate suppression by `message-id` for redelivered Kafka messages |
+| Polly.Core | Retry/rate-limit pipeline for outbound Telegram sends |
+| Microsoft.Extensions.Diagnostics.HealthChecks | Postgres/Redis/Kafka checks exposed at `/health` on a minimal web host (port 8090), alongside the existing `/metrics` listener on 8085 |
 | FluentResults | Result-type error handling across service calls |
 | Serilog | Structured logging |
 | Serilog.Sinks.GrafanaLoki | Log shipping to Grafana Loki |
@@ -191,8 +195,8 @@ Packages: `Telegram.Bot`, `RabbitMQ.Client`, `Serilog` with `Serilog.Sinks.Grafa
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - PostgreSQL 17 (database: `ArbiScannerBot`)
-- RabbitMQ 3.x with management plugin
-- Redis (used for RabbitMQ message-dedupe — see [RabbitMQ Message Flow](#rabbitmq-message-flow))
+- Apache Kafka 3.x with the `spreads` topic created (the monorepo's `kafka-init` job, or `kafka-topics.sh --create --topic spreads`)
+- Redis (used for duplicate suppression — see [Kafka Message Flow](#kafka-message-flow))
 - A Telegram bot token obtained from [@BotFather](https://t.me/BotFather)
 - The ArbiScanner web application database must be migrated and reachable (the link table is shared)
 
@@ -207,7 +211,7 @@ Packages: `Telegram.Bot`, `RabbitMQ.Client`, `Serilog` with `Serilog.Sinks.Grafa
    git submodule update --init --recursive
    ```
 
-2. Ensure PostgreSQL, RabbitMQ, and Redis are running and accessible.
+2. Ensure PostgreSQL, Kafka, and Redis are running and accessible.
 
 3. Configure `appsettings.json` (or `appsettings.Development.json`) in `ArbiScanner.TelegramNotifierApp.Worker/`:
 
@@ -216,13 +220,11 @@ Packages: `Telegram.Bot`, `RabbitMQ.Client`, `Serilog` with `Serilog.Sinks.Grafa
      "ConnectionStrings": {
        "PostgreSqlConnection": "Host=localhost;Port=5432;Database=ArbiScannerBot;Username=postgres;Password=yourpassword"
      },
-     "RabbitMq": {
-       "Host": "localhost",
-       "Queue": "spread_telegram",
-       "Username": "guest",
-       "Password": "guest",
-       "Exchange": "spread_fanout_exchange",
-       "RoutingKey": ""
+     "Messaging": {
+       "ServiceName": "telegram"
+     },
+     "Kafka": {
+       "BootstrapServers": "localhost:9092"
      },
      "Redis": {
        "Endpoint": "localhost:6379"
@@ -269,13 +271,11 @@ All `appsettings.json` keys can be overridden with environment variables using t
 |---|---|
 | `TELEGRAM_BOT_TOKEN` | BotFather token for the Telegram bot. Maps to `Telegram__BotToken`. |
 | `ConnectionStrings__PostgreSqlConnection` | Full PostgreSQL connection string for the `ArbiScannerBot` database. |
-| `RabbitMq__Host` | Hostname or IP of the RabbitMQ broker. |
-| `RabbitMq__Queue` | Queue name (default: `spread_telegram`). |
-| `RabbitMq__Username` | RabbitMQ username. |
-| `RabbitMq__Password` | RabbitMQ password. |
-| `RabbitMq__Exchange` | Exchange name (default: `spread_fanout_exchange`). |
-| `RabbitMq__RoutingKey` | Routing key (empty string for fanout exchanges). |
-| `Redis__Endpoint` | Redis connection string, e.g. `redis:6379`. Used for RabbitMQ message-dedupe (see [RabbitMQ Message Flow](#rabbitmq-message-flow)). |
+| `Kafka__BootstrapServers` | Kafka bootstrap servers, e.g. `kafka:9092`. |
+| `Messaging__ServiceName` | Must be `telegram`; derives the consumer group `telegram-spreads` and the duplicate-suppression keys. |
+| `Messaging__Consumer__MaxOpenAlertAgeMinutes` | Open events older than this are not alerted on (default `10`). |
+| `Kafka__Consumer__Enabled` | `false` keeps the consumer from starting (default `true`). |
+| `Redis__Endpoint` | Redis connection string, e.g. `redis:6379`. Used for duplicate suppression (see [Kafka Message Flow](#kafka-message-flow)). |
 | `Serilog__WriteTo__1__Args__uri` | Grafana Loki endpoint URL (e.g. `http://loki:3100`). |
 | `OpenTelemetry__Endpoint` | OTLP gRPC endpoint for Grafana Tempo (e.g. `http://tempo:4317`). Defaults to `http://localhost:4317` from `appsettings.json`. |
 
@@ -297,22 +297,20 @@ docker build \
 
 **Run with Docker Compose (recommended):**
 
-The `docker-compose.yml` inside `ArbiScanner.TelegramNotifierApp/` starts the worker together with PostgreSQL 17, RabbitMQ 3 (with the management UI on port 15672), and Redis. The worker waits for all three to pass their health checks before starting.
+The `docker-compose.yml` inside `ArbiScanner.TelegramNotifierApp/` starts the worker together with PostgreSQL 17, a single-node Kafka (plus a one-shot `kafka-init` job that creates the topics), and Redis. The worker waits for all of them before starting.
 
 ```bash
 # From ArbiScanner.TelegramNotifierApp/
 TELEGRAM_BOT_TOKEN=your-bot-token docker compose up --build
 ```
 
-The compose file sets health checks for PostgreSQL (`pg_isready`), RabbitMQ (`rabbitmq-diagnostics ping`), and Redis (`redis-cli ping`), and restarts all services unless stopped manually. The worker itself also exposes `/health` (Postgres/Redis/RabbitMQ) on a minimal web host at port 8090, alongside the existing `/metrics` listener on 8085.
+The compose file sets health checks for PostgreSQL (`pg_isready`), Kafka (`kafka-broker-api-versions.sh`), and Redis (`redis-cli ping`), and restarts all services unless stopped manually. The worker itself also exposes `/health` (Postgres/Redis/Kafka) on a minimal web host at port 8090, alongside the existing `/metrics` listener on 8085.
 
 **Port mappings (compose):**
 
 | Service | Port |
 |---|---|
 | PostgreSQL | 5432 |
-| RabbitMQ AMQP | 5672 |
-| RabbitMQ Management UI | 15672 |
 | Redis | 6379 |
 | Worker `/metrics` (Prometheus) | 8085 |
 | Worker `/health` | 8090 |
@@ -354,6 +352,7 @@ The root monorepo also has `.github/workflows/docker-build.yml`, since this Work
 | File | Coverage |
 |---|---|
 | `SpreadServiceTests` | Spread percentage calculation and the Spot/Funding/Futures message constructors — including that a funding-rate line is included/omitted correctly (this is what would have caught a stale risk-level string left in a message template) |
+| `TelegramSpreadKafkaHandlerTests` | The Kafka handler: an Open alerts once, a redelivered `message-id` does not alert twice, an Open older than the replay window is dropped without a claim, Update does nothing, a failure releases the claim so the retry can alert, and a missing `message-id`, undecodable payload or unknown action is non-retryable |
 | `TelegramNotifierUserServiceTests` | `NotifyUser` against a substituted `ITelegramBotClient` — valid/empty/whitespace messages and bot-client exceptions all log as expected |
 | `TelegramUserServiceTests` | Link/unlink/active-status flows against a real EF Core `AppDbContext` backed by the in-memory provider (valid link, invalid link ID, link with no matching `UserSettings` row, unlinking a user that doesn't exist, etc.) |
 
@@ -391,7 +390,7 @@ ArbiScanner.TelegramNotifierApp/
 ├── ArbiScanner.TelegramNotifierApp.Worker/
 │   ├── Worker/
 │   │   ├── MessageBroker/
-│   │   │   └── SpreadsMessageBroker.cs  # RabbitMQ consumer BackgroundService
+│   │   │   └── TelegramSpreadKafkaHandler.cs  # Kafka message handler (dedupe, replay guard, Open/Close dispatch)
 │   │   └── TelegramMessageController/
 │   │       ├── TelegramMessageController.cs  # Bot polling BackgroundService
 │   │       └── TelegramMainController.cs     # Update router and command handlers
@@ -407,7 +406,7 @@ ArbiScanner.TelegramNotifierApp/
 │
 ├── ArbiScanner.slnx                     # Solution file
 ├── Dockerfile                           # Multi-stage build (context: repo root)
-└── docker-compose.yml                   # Worker + PostgreSQL + RabbitMQ stack
+└── docker-compose.yml                   # Worker + PostgreSQL + Kafka + Redis stack
 ```
 
 ### Cross-project dependencies

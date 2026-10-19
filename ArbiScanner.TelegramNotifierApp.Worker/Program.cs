@@ -6,6 +6,8 @@ using ArbiScanner.TelegramNotifierApp.Worker.Worker.MessageBroker;
 using ArbiScanner.TelegramNotifierApp.Worker.Worker.TelegramMessageController;
 using ArbiScannerWeb.Abstractions.Interfaces;
 using ArbiScannerWeb.Infrastructure.HealthChecks;
+using ArbiScannerWeb.Infrastructure.Messaging;
+using ArbiScannerWeb.Messaging.Kafka;
 using ArbiScannerWeb.Infrastructure.Services;
 using ArbiScannerWeb.Infrastructure.Settings;
 using Microsoft.AspNetCore.Builder;
@@ -46,11 +48,10 @@ try
         })
         .ConfigureServices((context, services) =>
         {
-            services.AddHostedService<SpreadsMessageBroker>();
             services.AddHostedService<TelegramMessageController>();
 
             services.AddScoped<MainController>();
-            services.AddSingleton<IRabbitMqService, RabbitMqService>();
+            services.AddSpreadMessaging<TelegramSpreadKafkaHandler>(context.Configuration);
             services.AddSingleton<IConnectionMultiplexer>(sp =>
             {
                 var redisEndpoint = context.Configuration["Redis:Endpoint"] ?? "localhost:6379";
@@ -70,13 +71,12 @@ try
 
             services.AddDbContextFactory<AppDbContext>(options =>
                 options.UseNpgsql(context.Configuration.GetConnectionString("PostgreSqlConnection")));
-            services.Configure<RabbitMqSettings>(context.Configuration.GetSection("RabbitMq"));
             services.Configure<TelegramSettings>(context.Configuration.GetSection("Telegram"));
 
             services.AddHealthChecks()
                 .AddCheck<DbContextFactoryHealthCheck<AppDbContext>>("postgres")
                 .AddCheck<RedisHealthCheck>("redis")
-                .AddCheck<RabbitMqHealthCheck>("rabbitmq");
+                .AddCheck<KafkaHealthCheck>("kafka");
 
             if (context.Configuration.GetValue("Observability:Enabled", true))
             {
@@ -85,11 +85,12 @@ try
                     .WithTracing(tracing => tracing
                         .AddHttpClientInstrumentation(o => o.RecordException = true)
                         .AddEntityFrameworkCoreInstrumentation()
-                        .AddSource("RabbitMQ.Client.*")
+                        .AddSource(KafkaTelemetry.SourceName)
                         .AddOtlpExporter())
                     .WithMetrics(metrics => metrics
                         .AddHttpClientInstrumentation()
                         .AddRuntimeInstrumentation()
+                        .AddMeter(ConsumerMetrics.MeterName)
                         .AddPrometheusHttpListener(o => o.UriPrefixes = ["http://+:8085/"]));
             }
         })
