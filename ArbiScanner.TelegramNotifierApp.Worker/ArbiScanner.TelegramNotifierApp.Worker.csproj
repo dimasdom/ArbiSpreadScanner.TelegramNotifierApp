@@ -11,6 +11,7 @@
     <ProjectReference Include="../../ArbiScannerAdminPannel/ArbiScannerAdminPanel.Infrastructure/ArbiScannerAdminPanel.Infrastructure.csproj" />
     <ProjectReference Include="../../ArbiScannerWebApp/ArbiScannerWeb.Abstractions/ArbiScannerWeb.Abstractions.csproj" />
     <ProjectReference Include="../../ArbiScannerWebApp/ArbiScannerWeb.Domain/ArbiScannerWeb.Domain.csproj" />
+    <ProjectReference Include="../../ArbiScannerWebApp/ArbiScannerWeb.Messaging.Kafka/ArbiScannerWeb.Messaging.Kafka.csproj" />
     <ProjectReference Include="../ArbiScanner.TelegramNotifierApp.Abstractions/ArbiScanner.TelegramNotifierApp.Abstractions.csproj" />
     <ProjectReference Include="../ArbiScanner.TelegramNotifierApp.Application/ArbiScanner.TelegramNotifierApp.Application.csproj" />
     <ProjectReference Include="../ArbiScanner.TelegramNotifierApp.Domain/ArbiScanner.TelegramNotifierApp.Domain.csproj" />

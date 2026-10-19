@@ -6,6 +6,8 @@ using ArbiScanner.TelegramNotifierApp.Worker.Worker.MessageBroker;
 using ArbiScanner.TelegramNotifierApp.Worker.Worker.TelegramMessageController;
 using ArbiScannerWeb.Abstractions.Interfaces;
 using ArbiScannerWeb.Infrastructure.HealthChecks;
+using ArbiScannerWeb.Infrastructure.Messaging;
+using ArbiScannerWeb.Messaging.Kafka;
 using ArbiScannerWeb.Infrastructure.Services;
 using ArbiScannerWeb.Infrastructure.Settings;
 using Microsoft.AspNetCore.Builder;
@@ -51,6 +53,8 @@ try
 
             services.AddScoped<MainController>();
             services.AddSingleton<IRabbitMqService, RabbitMqService>();
+            // Kafka side of the RabbitMQ -> Kafka migration; a no-op unless Messaging:Consumer:Mode=Shadow.
+            services.AddSpreadMessaging(context.Configuration);
             services.AddSingleton<IConnectionMultiplexer>(sp =>
             {
                 var redisEndpoint = context.Configuration["Redis:Endpoint"] ?? "localhost:6379";
@@ -86,10 +90,12 @@ try
                         .AddHttpClientInstrumentation(o => o.RecordException = true)
                         .AddEntityFrameworkCoreInstrumentation()
                         .AddSource("RabbitMQ.Client.*")
+                        .AddSource(KafkaTelemetry.SourceName)
                         .AddOtlpExporter())
                     .WithMetrics(metrics => metrics
                         .AddHttpClientInstrumentation()
                         .AddRuntimeInstrumentation()
+                        .AddMeter(ParityMetrics.MeterName)
                         .AddPrometheusHttpListener(o => o.UriPrefixes = ["http://+:8085/"]));
             }
         })
