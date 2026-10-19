@@ -48,13 +48,18 @@ try
         })
         .ConfigureServices((context, services) =>
         {
-            services.AddHostedService<SpreadsMessageBroker>();
+            // RabbitMQ -> Kafka migration: in Kafka mode RabbitMQ is not consumed at all (see docs/architecture/kafka-migration-plan.md).
+            var consumerMode = context.Configuration.GetConsumerMode();
+            if (consumerMode != MessagingConsumerMode.Kafka)
+            {
+                services.AddHostedService<SpreadsMessageBroker>();
+                services.AddSingleton<IRabbitMqService, RabbitMqService>();
+            }
+
             services.AddHostedService<TelegramMessageController>();
 
             services.AddScoped<MainController>();
-            services.AddSingleton<IRabbitMqService, RabbitMqService>();
-            // Kafka side of the RabbitMQ -> Kafka migration; a no-op unless Messaging:Consumer:Mode=Shadow.
-            services.AddSpreadMessaging(context.Configuration);
+            services.AddSpreadMessaging<TelegramSpreadKafkaHandler>(context.Configuration);
             services.AddSingleton<IConnectionMultiplexer>(sp =>
             {
                 var redisEndpoint = context.Configuration["Redis:Endpoint"] ?? "localhost:6379";
@@ -77,10 +82,18 @@ try
             services.Configure<RabbitMqSettings>(context.Configuration.GetSection("RabbitMq"));
             services.Configure<TelegramSettings>(context.Configuration.GetSection("Telegram"));
 
-            services.AddHealthChecks()
+            var healthChecks = services.AddHealthChecks()
                 .AddCheck<DbContextFactoryHealthCheck<AppDbContext>>("postgres")
-                .AddCheck<RedisHealthCheck>("redis")
-                .AddCheck<RabbitMqHealthCheck>("rabbitmq");
+                .AddCheck<RedisHealthCheck>("redis");
+            // The broker that carries spread events gates health; the other one must not. (Shadow mode adds no Kafka check on purpose.)
+            if (consumerMode == MessagingConsumerMode.Kafka)
+            {
+                healthChecks.AddCheck<KafkaHealthCheck>("kafka");
+            }
+            else
+            {
+                healthChecks.AddCheck<RabbitMqHealthCheck>("rabbitmq");
+            }
 
             if (context.Configuration.GetValue("Observability:Enabled", true))
             {
@@ -96,6 +109,7 @@ try
                         .AddHttpClientInstrumentation()
                         .AddRuntimeInstrumentation()
                         .AddMeter(ParityMetrics.MeterName)
+                        .AddMeter(ConsumerMetrics.MeterName)
                         .AddPrometheusHttpListener(o => o.UriPrefixes = ["http://+:8085/"]));
             }
         })
