@@ -12,7 +12,7 @@ namespace ArbiScanner.TelegramNotifierApp.Worker.Worker.MessageBroker;
 
 /// <summary>
 /// The live Kafka consumer of the Telegram notifier. Only <c>Open</c> events do anything (a user alert); <c>Update</c> is ignored
-/// and <c>Close</c> is only logged, exactly as on the old RabbitMQ path.
+/// and <c>Close</c> is only logged, exactly as before the move to Kafka.
 /// </summary>
 /// <remarks>
 /// Alerts are user-visible and cannot be undone, so two guards apply before one is sent: a duplicate of an already-processed
